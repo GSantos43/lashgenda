@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model StudioConfig {
+  id                  Int      @id @default(1)
+  studioName          String   @default("Bella Lash Studio")
+  professionalName    String   @default("Camila Andrade")
+  tagline             String   @default("Especialista em Extensão de Cílios & Olhar Marcante ✨")
+  bio                 String   @default("Realçando sua beleza natural com técnicas exclusivas, saúde ocular e durabilidade impecável.")
+  address             String   @default("Av. Paulista, 1000 - Sala 402, Jardins - São Paulo/SP")
+  whatsapp            String   @default("11999999999")
+  instagram           String   @default("@bellalash.studio")
+  logoUrl             String   @default("https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&auto=format&fit=crop&q=80")
+  coverUrl            String   @default("https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=1000&auto=format&fit=crop&q=80")
+  badgesJson          String   @default("[\"❄️ Ambiente Climatizado\", \"☕ Café & Espumante\", \"📶 Wi-Fi Grátis\", \"✨ Materiais Premium\"]")
+  themeMode           String   @default("dark-rose") // "dark-rose", "light-rose", "gold-luxury"
+  minAdvanceHours     Int      @default(2)
+  availableSlotsJson  String   @default("[\"09:00\", \"10:30\", \"13:30\", \"15:00\", \"16:30\", \"18:00\", \"19:30\"]")
+  portfolioJson       String   @default("[\"https://images.unsplash.com/photo-1583001931096-959e9a1a6223?w=500&auto=format&fit=crop&q=80\",\"https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=500&auto=format&fit=crop&q=80\",\"https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=80\"]")
+  whatsappMessageTemplate String @default("Olá! Gostaria de tirar uma dúvida sobre os procedimentos de extensão de cílios ✨")
+  adminUsername       String   @default("admin")
+  adminPassword       String   @default("123456")
+  updatedAt           DateTime @updatedAt
+}
+
+model LinkItem {
+  id          Int      @id @default(autoincrement())
+  title       String
+  subtitle    String   @default("")
+  url         String
+  icon        String   @default("sparkles") // calendar, book-open, message-circle, map-pin, instagram, sparkles, heart, external-link
+  highlight   Boolean  @default(false)
+  active      Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model Service {
+  id          Int           @id @default(autoincrement())
+  name        String
+  category    String        @default("Extensão de Cílios") // "Extensão de Cílios", "Manutenção", "Lash Lifting & Outros"
+  description String        @default("")
+  price       Float
+  duration    String        @default("1h 30min")
+  imageUrl    String        @default("")
+  featured    Boolean       @default(false)
+  active      Boolean       @default(true)
+  order       Int           @default(0)
+  createdAt   DateTime      @default(now())
+  appointments Appointment[]
+}
+
+model Appointment {
+  id            Int      @id @default(autoincrement())
+  serviceId     Int?
+  service       Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  serviceName   String
+  price         Float
+  duration      String   @default("1h 30min")
+  date          String   // YYYY-MM-DD
+  time          String   // HH:mm
+  clientName    String
+  clientPhone   String   // normalized digits e.g. 11988887777
+  clientNotes   String   @default("")
+  status        String   @default("agendado") // "agendado", "concluido", "cancelado"
+  cancelReason  String   @default("")
+  canceledBy    String   @default("") // "cliente", "profissional"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([date, status])
+  @@index([clientPhone])
+}
+
+model ScheduleBlock {
+  id        Int      @id @default(autoincrement())
+  date      String   // YYYY-MM-DD
+  type      String   @default("dia") // "dia" or "horario"
+  startTime String   @default("")    // HH:mm
+  endTime   String   @default("")    // HH:mm
+  reason    String   @default("Agenda fechada / Folga")
+  createdAt DateTime @default(now())
+
+  @@index([date])
+}
+
+model BlockedClient {
+  id        Int      @id @default(autoincrement())
+  phone     String   @unique
+  name      String   @default("")
+  reason    String   @default("")
+  createdAt DateTime @default(now())
+}
+
+model WhatsappEvent {
+  id            Int      @id @default(autoincrement())
+  type          String   // "novo_agendamento", "cancelamento_cliente", "lembrete"
+  clientName    String
+  clientPhone   String
+  serviceName   String
+  date          String
+  time          String
+  message       String
+  read          Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
