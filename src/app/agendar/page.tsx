@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { DatePicker } from "@/components/DatePicker";
 import { AnimatedModal } from "@/components/AnimatedModal";
+import { ScrollArea } from "@/components/ScrollArea";
 
 interface StudioConfig {
   studioName: string;
@@ -176,6 +177,119 @@ function formatModalDateAndTime(dateStr: string, timeStr: string): string {
   return `${WEEKDAYS_SHORT_PT[weekdayIndex]}, ${dd}/${mm} - ${timeStr}h`;
 }
 
+function AgendarSkeleton() {
+  return (
+    <div className="min-h-screen bg-[#FAF8F5] text-[#111111] pb-12 font-sans">
+      <div className="max-w-[440px] mx-auto min-h-screen bg-[#FAF8F5] relative animate-pulse">
+        {/* Header + Stepper Skeleton */}
+        <header className="sticky top-0 z-30 bg-[#FAF8F5]/95 border-b border-[#EFECE6]/80">
+          <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-[#E8E2D9]" />
+              <div className="h-5 w-40 rounded-lg bg-[#E8E2D9]" />
+            </div>
+            <div className="w-10 h-10 rounded-full bg-[#E8E2D9]" />
+          </div>
+
+          <div className="px-5 pb-3.5 pt-1 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <div className="w-6 h-6 rounded-full bg-[#EADCE0]" />
+              <div className="h-3.5 w-12 rounded bg-[#E8E2D9]" />
+            </div>
+            <div className="h-[2px] flex-1 bg-[#E8E2D9] rounded-full mx-1" />
+            <div className="flex items-center gap-1.5">
+              <div className="w-6 h-6 rounded-full bg-[#D6CFC5]" />
+              <div className="h-3.5 w-16 rounded bg-[#E8E2D9]" />
+            </div>
+            <div className="h-[1.5px] flex-1 bg-[#E8E2D9] rounded-full mx-1" />
+            <div className="flex items-center gap-1.5">
+              <div className="w-6 h-6 rounded-full bg-[#E8E2D9]" />
+              <div className="h-3.5 w-12 rounded bg-[#E8E2D9]" />
+            </div>
+          </div>
+        </header>
+
+        <main className="px-5 pt-3 space-y-6">
+          {/* Chosen Procedure Card Skeleton */}
+          <div className="p-4 rounded-[22px] bg-[#EADCE0]/70 flex items-center justify-between gap-3.5">
+            <div className="flex items-center gap-3.5 flex-1">
+              <div className="w-14 h-14 rounded-2xl bg-[#D8C5CA] shrink-0" />
+              <div className="space-y-2 flex-1">
+                <div className="h-2.5 w-28 rounded bg-[#C9B3B9]" />
+                <div className="h-4 w-40 rounded bg-[#C9B3B9]" />
+                <div className="h-3.5 w-20 rounded bg-[#C9B3B9]" />
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-white/80 shrink-0" />
+          </div>
+
+          {/* Selecione o dia Skeleton */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="h-4 w-32 rounded-lg bg-[#E8E2D9]" />
+              <div className="h-3 w-20 rounded bg-[#E8E2D9]" />
+            </div>
+            <div className="h-[52px] w-full rounded-[18px] bg-[#EDE8E0]" />
+          </div>
+
+          {/* Horários disponíveis Skeleton */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="h-4 w-40 rounded-lg bg-[#E8E2D9]" />
+              <div className="h-3 w-24 rounded bg-[#E8E2D9]" />
+            </div>
+            <div className="p-4 rounded-[22px] bg-white space-y-3 shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
+              <div className="h-2.5 w-16 rounded bg-[#E8E2D9]" />
+              <div className="grid grid-cols-4 gap-2.5">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-11 rounded-[14px] bg-[#F3EFEA]"
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Seus dados Skeleton */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="h-4 w-48 rounded-lg bg-[#E8E2D9]" />
+              <div className="h-3 w-20 rounded bg-[#E8E2D9]" />
+            </div>
+            <div className="space-y-2.5">
+              <div className="h-[66px] rounded-[20px] bg-white p-4 space-y-2">
+                <div className="h-2.5 w-24 rounded bg-[#EDE8E0]" />
+                <div className="h-4 w-44 rounded bg-[#F3EFEA]" />
+              </div>
+              <div className="h-[66px] rounded-[20px] bg-white p-4 space-y-2">
+                <div className="h-2.5 w-36 rounded bg-[#EDE8E0]" />
+                <div className="h-4 w-36 rounded bg-[#F3EFEA]" />
+              </div>
+              <div className="h-[66px] rounded-[20px] bg-white p-4 space-y-2">
+                <div className="h-2.5 w-40 rounded bg-[#EDE8E0]" />
+                <div className="h-4 w-52 rounded bg-[#F3EFEA]" />
+              </div>
+              <div className="grid grid-cols-5 gap-2.5">
+                <div className="col-span-2 h-[66px] rounded-[20px] bg-white p-4 space-y-2">
+                  <div className="h-2.5 w-14 rounded bg-[#EDE8E0]" />
+                  <div className="h-4 w-12 rounded bg-[#F3EFEA]" />
+                </div>
+                <div className="col-span-3 h-[66px] rounded-[20px] bg-white p-4 space-y-2">
+                  <div className="h-2.5 w-28 rounded bg-[#EDE8E0]" />
+                  <div className="h-4 w-32 rounded bg-[#F3EFEA]" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* CTA Button Skeleton */}
+          <div className="h-14 w-full rounded-[20px] bg-[#E2DDD5]" />
+        </main>
+      </div>
+    </div>
+  );
+}
 function formatPhoneMask(val: string): string {
   const digits = val.replace(/\D/g, "").slice(0, 11);
   if (digits.length === 0) return "";
@@ -194,9 +308,35 @@ function AgendarContent() {
   const dateInputRef = useRef<HTMLInputElement | null>(null);
   const [enterKey, setEnterKey] = useState(0);
 
+  // Reset booking success and form state whenever entering /agendar (or returning via browser/router)
+  const resetBookingState = () => {
+    setBookingSuccess(null);
+    setShowReviewModal(false);
+    setBookingError("");
+    setSelectedDate("");
+    setSelectedTime("");
+    setClientName("");
+    setClientPhone("");
+    setClientAddress("");
+    setClientNotes("");
+  };
+
   useEffect(() => {
+    resetBookingState();
     setEnterKey((k) => k + 1);
-  }, [pathname]);
+  }, [pathname, searchParams]);
+
+  useEffect(() => {
+    const handlePageShow = () => {
+      resetBookingState();
+    };
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("popstate", handlePageShow);
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("popstate", handlePageShow);
+    };
+  }, []);
 
   const [initialLoading, setInitialLoading] = useState(true);
   const [config, setConfig] = useState<StudioConfig | null>(null);
@@ -211,6 +351,33 @@ function AgendarContent() {
   const [clientName, setClientName] = useState<string>("");
   const [clientPhone, setClientPhone] = useState<string>("");
   const [clientAddress, setClientAddress] = useState<string>("");
+  const [addressStreetQuery, setAddressStreetQuery] = useState<string>("");
+  const [addressNumber, setAddressNumber] = useState<string>("");
+  const [addressComplement, setAddressComplement] = useState<string>("");
+  const [addressVerifiedBase, setAddressVerifiedBase] = useState<{
+    street: string;
+    suburb: string;
+    city: string;
+    state: string;
+    postcode: string;
+    formatted: string;
+  } | null>(null);
+  const [geoSuggestions, setGeoSuggestions] = useState<
+    Array<{
+      placeId: string;
+      street: string;
+      suburb: string;
+      city: string;
+      state: string;
+      postcode: string;
+      line1: string;
+      line2: string;
+      formatted: string;
+      housenumber?: string;
+    }>
+  >([]);
+  const [loadingGeo, setLoadingGeo] = useState<boolean>(false);
+  const [showGeoDropdown, setShowGeoDropdown] = useState<boolean>(false);
   const [clientNotes, setClientNotes] = useState<string>("");
 
   // Slots loading state
@@ -339,6 +506,128 @@ function AgendarContent() {
   };
 
   const phoneDigits = clientPhone.replace(/\D/g, "");
+
+  // Keep clientAddress synchronized whenever verified street, number, or complement changes
+  useEffect(() => {
+    if (!addressVerifiedBase) {
+      setClientAddress("");
+      return;
+    }
+    const numPart = addressNumber.trim() || "S/N";
+    const streetName =
+      addressVerifiedBase.street || addressVerifiedBase.formatted;
+    const areaParts = [
+      addressVerifiedBase.suburb,
+      addressVerifiedBase.city && addressVerifiedBase.state
+        ? `${addressVerifiedBase.city} - ${addressVerifiedBase.state}`
+        : addressVerifiedBase.city || addressVerifiedBase.state,
+      addressVerifiedBase.postcode,
+    ].filter(Boolean);
+
+    let full = `${streetName}, ${numPart}`;
+    if (areaParts.length > 0) {
+      full += ` - ${areaParts.join(", ")}`;
+    }
+    if (addressComplement.trim()) {
+      full += ` (${addressComplement.trim()})`;
+    }
+    setClientAddress(full);
+  }, [addressVerifiedBase, addressNumber, addressComplement]);
+
+  // Debounced Geoapify address autocomplete
+  useEffect(() => {
+    const q = addressStreetQuery.trim();
+    if (
+      addressVerifiedBase &&
+      q === (addressVerifiedBase.street || addressVerifiedBase.formatted)
+    ) {
+      setGeoSuggestions([]);
+      setLoadingGeo(false);
+      return;
+    }
+    if (q.length < 3) {
+      setGeoSuggestions([]);
+      setLoadingGeo(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        setLoadingGeo(true);
+        const apiKey =
+          process.env.NEXT_PUBLIC_GEOAPIFY_KEY ||
+          "3b4d69632b19443ba05956f3a749ebdb";
+        // Scoped strictly to Vitória da Conquista - BA (25km radius around city center -14.8619, -40.8442)
+        const url = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(
+          q
+        )}&lang=pt&filter=circle:-40.8442,-14.8619,25000&bias=proximity:-40.8442,-14.8619&limit=6&format=json&apiKey=${apiKey}`;
+
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) {
+          setGeoSuggestions([]);
+          return;
+        }
+        const data = await res.json();
+        const rawList = Array.isArray(data?.results) ? data.results : [];
+        const mapped = rawList
+          .map((item: Record<string, unknown>, idx: number) => {
+            const street = String(
+              item.street || item.name || item.address_line1 || ""
+            ).trim();
+            const suburb = String(
+              item.suburb || item.district || item.quarter || ""
+            ).trim();
+            const city = String(
+              item.city || item.town || item.municipality || ""
+            ).trim();
+            const state = String(item.state_code || item.state || "").trim();
+            const postcode = String(item.postcode || "").trim();
+            const formatted = String(item.formatted || "").trim();
+            const line1 = String(
+              item.address_line1 || street || formatted
+            ).trim();
+            const line2 = String(
+              item.address_line2 ||
+                [suburb, city && state ? `${city} - ${state}` : city, postcode]
+                  .filter(Boolean)
+                  .join(", ")
+            ).trim();
+            const housenumber = item.housenumber
+              ? String(item.housenumber).trim()
+              : undefined;
+
+            return {
+              placeId: String(item.place_id || `${line1}-${idx}`),
+              street: street || line1,
+              suburb,
+              city,
+              state,
+              postcode,
+              line1,
+              line2,
+              formatted: formatted || `${line1}, ${line2}`,
+              housenumber,
+            };
+          })
+          .filter(
+            (item: { line1: string }) => Boolean(item.line1)
+          );
+
+        setGeoSuggestions(mapped);
+      } catch {
+        // ignore abort errors
+      } finally {
+        setLoadingGeo(false);
+      }
+    }, 280);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [addressStreetQuery, addressVerifiedBase]);
+
   const isFormReady = Boolean(
     selectedServiceId &&
       selectedDate &&
@@ -346,6 +635,8 @@ function AgendarContent() {
       clientName.trim().length >= 2 &&
       phoneDigits.length >= 10 &&
       phoneDigits.length <= 11 &&
+      addressVerifiedBase &&
+      addressNumber.trim().length >= 1 &&
       clientAddress.trim().length >= 5
   );
 
@@ -371,9 +662,15 @@ function AgendarContent() {
       setBookingError("Informe seu WhatsApp com DDD (ex: (11) 98765-4321).");
       return;
     }
-    if (!clientAddress.trim() || clientAddress.trim().length < 5) {
+    if (!addressVerifiedBase) {
       setBookingError(
-        "Informe seu endereço completo para o atendimento a domicílio."
+        "Digite sua rua ou CEP e selecione uma opção válida na lista de sugestões do mapa."
+      );
+      return;
+    }
+    if (!addressNumber.trim()) {
+      setBookingError(
+        "Informe o número do imóvel (ou digite S/N caso não possua número)."
       );
       return;
     }
@@ -528,14 +825,7 @@ function AgendarContent() {
   };
 
   if (initialLoading) {
-    return (
-      <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center p-6 text-center">
-        <Loader2 className="w-8 h-8 text-[#111111] animate-spin mb-3" />
-        <p className="text-xs font-bold uppercase tracking-widest text-[#78716C]">
-          Carregando Novo Agendamento...
-        </p>
-      </div>
-    );
+    return <AgendarSkeleton />;
   }
 
   return (
@@ -560,7 +850,10 @@ function AgendarContent() {
             <div className="flex items-center gap-2.5">
               <button
                 type="button"
-                onClick={() => router.push("/")}
+                onClick={() => {
+                  resetBookingState();
+                  router.push("/");
+                }}
                 aria-label="Voltar"
                 className="w-8 h-8 -ml-1.5 rounded-full flex items-center justify-center text-[#111111] hover:bg-black/5 smooth-press cursor-pointer"
               >
@@ -590,73 +883,75 @@ function AgendarContent() {
           </div>
 
           {/* STEPPER BAR: 1 Serviço --- 2 Data & Hora --- 3 Revisão */}
-          <div className="px-5 pb-3.5 pt-1 flex items-center justify-between gap-2 animate-card">
-            {/* Step 1 */}
-            <button
-              type="button"
-              onClick={() => setShowServicePicker(true)}
-              className="flex items-center gap-1.5 shrink-0 group smooth-press cursor-pointer"
-            >
-              <span className="w-6 h-6 rounded-full bg-[#EADCE0] text-[#574147] text-[11px] font-bold flex items-center justify-center transition-transform group-hover:scale-105">
-                1
-              </span>
-              <span className="text-[12px] font-medium text-[#78716C] group-hover:text-[#111111] transition-colors">
-                Serviço
-              </span>
-            </button>
-
-            {/* Line 1 -> 2 */}
-            <div className="h-[2px] flex-1 bg-[#111111] rounded-full mx-1" />
-
-            {/* Step 2 (Active) */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span
-                className={`w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center transition-all duration-300 ${
-                  showReviewModal
-                    ? "bg-[#EADCE0] text-[#574147]"
-                    : "bg-[#09090B] text-white"
-                }`}
+          {!bookingSuccess && (
+            <div className="px-5 pb-3.5 pt-1 flex items-center justify-between gap-2 animate-card">
+              {/* Step 1 */}
+              <button
+                type="button"
+                onClick={() => setShowServicePicker(true)}
+                className="flex items-center gap-1.5 shrink-0 group smooth-press cursor-pointer"
               >
-                2
-              </span>
-              <span
-                className={`text-[12px] font-bold transition-colors ${
-                  showReviewModal ? "text-[#78716C]" : "text-[#111111]"
+                <span className="w-6 h-6 rounded-full bg-[#EADCE0] text-[#574147] text-[11px] font-bold flex items-center justify-center transition-transform group-hover:scale-105">
+                  1
+                </span>
+                <span className="text-[12px] font-medium text-[#78716C] group-hover:text-[#111111] transition-colors">
+                  Serviço
+                </span>
+              </button>
+
+              {/* Line 1 -> 2 */}
+              <div className="h-[2px] flex-1 bg-[#111111] rounded-full mx-1" />
+
+              {/* Step 2 (Active) */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span
+                  className={`w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center transition-all duration-300 ${
+                    showReviewModal
+                      ? "bg-[#EADCE0] text-[#574147]"
+                      : "bg-[#09090B] text-white"
+                  }`}
+                >
+                  2
+                </span>
+                <span
+                  className={`text-[12px] font-bold transition-colors ${
+                    showReviewModal ? "text-[#78716C]" : "text-[#111111]"
+                  }`}
+                >
+                  Data & Hora
+                </span>
+              </div>
+
+              {/* Line 2 -> 3 */}
+              <div
+                className={`h-[1.5px] flex-1 rounded-full mx-1 transition-colors duration-300 ${
+                  showReviewModal ? "bg-[#111111]" : "bg-[#E5E0D8]"
                 }`}
-              >
-                Data & Hora
-              </span>
+              />
+
+              {/* Step 3 */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span
+                  className={`w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center transition-all duration-300 ${
+                    showReviewModal
+                      ? "bg-[#09090B] text-white"
+                      : "bg-[#EAE5DF] text-[#9CA3AF]"
+                  }`}
+                >
+                  3
+                </span>
+                <span
+                  className={`text-[12px] font-medium transition-colors ${
+                    showReviewModal
+                      ? "text-[#111111] font-bold"
+                      : "text-[#9CA3AF]"
+                  }`}
+                >
+                  Revisão
+                </span>
+              </div>
             </div>
-
-            {/* Line 2 -> 3 */}
-            <div
-              className={`h-[1.5px] flex-1 rounded-full mx-1 transition-colors duration-300 ${
-                showReviewModal ? "bg-[#111111]" : "bg-[#E5E0D8]"
-              }`}
-            />
-
-            {/* Step 3 */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span
-                className={`w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center transition-all duration-300 ${
-                  showReviewModal
-                    ? "bg-[#09090B] text-white"
-                    : "bg-[#EAE5DF] text-[#9CA3AF]"
-                }`}
-              >
-                3
-              </span>
-              <span
-                className={`text-[12px] font-medium transition-colors ${
-                  showReviewModal
-                    ? "text-[#111111] font-bold"
-                    : "text-[#9CA3AF]"
-                }`}
-              >
-                Revisão
-              </span>
-            </div>
-          </div>
+          )}
         </header>
 
         <main
@@ -829,7 +1124,7 @@ function AgendarContent() {
                 <button
                   type="button"
                   onClick={() => {
-                    setBookingSuccess(null);
+                    resetBookingState();
                   }}
                   className="w-full py-3.5 px-4 rounded-[18px] bg-[#F3EFEA] text-[#111111] text-xs font-bold hover:bg-[#EAE4DC] smooth-press cursor-pointer"
                 >
@@ -955,11 +1250,16 @@ function AgendarContent() {
                     </p>
                   </div>
                 ) : loadingSlots ? (
-                  <div className="p-8 rounded-[22px] bg-white flex flex-col items-center justify-center gap-2 shadow-xs animate-expand">
-                    <Loader2 className="w-6 h-6 text-[#111111] animate-spin" />
-                    <span className="text-xs text-[#78716C] font-medium">
-                      Consultando disponibilidade...
-                    </span>
+                  <div className="p-4 rounded-[22px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.02)] space-y-3 animate-pulse">
+                    <div className="h-2.5 w-16 rounded bg-[#E8E2D9]" />
+                    <div className="grid grid-cols-4 gap-2.5">
+                      {Array.from({ length: 8 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className="h-11 rounded-[14px] bg-[#F3EFEA]"
+                        />
+                      ))}
+                    </div>
                   </div>
                 ) : isFullDayBlocked ? (
                   <div className="p-5 rounded-[22px] bg-white border border-red-200 text-center space-y-1 animate-expand">
@@ -1040,6 +1340,7 @@ function AgendarContent() {
                         id="input-client-name"
                         type="text"
                         required
+                        autoComplete="off"
                         value={clientName}
                         onChange={(e) => setClientName(e.target.value)}
                         placeholder="Mariana Silveira"
@@ -1074,6 +1375,7 @@ function AgendarContent() {
                         type="tel"
                         inputMode="numeric"
                         required
+                        autoComplete="off"
                         value={clientPhone}
                         onChange={(e) =>
                           setClientPhone(formatPhoneMask(e.target.value))
@@ -1084,25 +1386,187 @@ function AgendarContent() {
                     </div>
                   </div>
 
-                  {/* ENDEREÇO PARA ATENDIMENTO A DOMICÍLIO */}
-                  <div className="px-4 py-3.5 rounded-[20px] bg-white shadow-[0_2px_10px_rgba(0,0,0,0.02)] smooth-card">
-                    <label
-                      htmlFor="input-client-address"
-                      className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[#78716C] mb-1.5"
-                    >
-                      ENDEREÇO (ATENDIMENTO A DOMICÍLIO)
-                    </label>
-                    <div className="flex items-center gap-2.5">
-                      <MapPin className="w-4 h-4 text-[#9CA3AF] shrink-0" />
-                      <input
-                        id="input-client-address"
-                        type="text"
-                        required
-                        value={clientAddress}
-                        onChange={(e) => setClientAddress(e.target.value)}
-                        placeholder="Rua, número, complemento e bairro"
-                        className="w-full bg-transparent text-[14px] font-medium text-[#111111] placeholder:text-[#C0B9B0] focus:outline-none"
-                      />
+                  {/* ENDEREÇO PARA ATENDIMENTO A DOMICÍLIO (Geoapify Autocomplete + Número) */}
+                  <div className="space-y-2.5">
+                    <div className="px-4 py-3.5 rounded-[20px] bg-white shadow-[0_2px_10px_rgba(0,0,0,0.02)] smooth-card relative">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label
+                          htmlFor="input-client-address"
+                          className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[#78716C]"
+                        >
+                          RUA / ENDEREÇO (BUSCA NO MAPA)
+                        </label>
+                        {addressVerifiedBase ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[#10B981]">
+                            <Check className="w-3 h-3 stroke-[2.8]" />
+                            <span>Localizado no Maps</span>
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-semibold text-[#A8A29E]">
+                            Selecione na lista
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2.5">
+                        <MapPin
+                          className={`w-4 h-4 shrink-0 transition-colors ${
+                            addressVerifiedBase
+                              ? "text-[#10B981]"
+                              : "text-[#9CA3AF]"
+                          }`}
+                        />
+                        <input
+                          id="input-client-address"
+                          type="text"
+                          required
+                          autoComplete="off"
+                          value={addressStreetQuery}
+                          onFocus={() => setShowGeoDropdown(true)}
+                          onBlur={() => {
+                            setTimeout(() => setShowGeoDropdown(false), 180);
+                          }}
+                          onChange={(e) => {
+                            setAddressStreetQuery(e.target.value);
+                            setAddressVerifiedBase(null);
+                            setShowGeoDropdown(true);
+                          }}
+                          placeholder="Digite sua rua, avenida ou CEP..."
+                          className="w-full bg-transparent text-[14px] font-medium text-[#111111] placeholder:text-[#C0B9B0] focus:outline-none"
+                        />
+                        {loadingGeo && (
+                          <Loader2 className="w-4 h-4 text-[#78716C] animate-spin shrink-0" />
+                        )}
+                        {addressStreetQuery && !loadingGeo && (
+                          <button
+                            type="button"
+                            aria-label="Limpar endereço"
+                            onClick={() => {
+                              setAddressStreetQuery("");
+                              setAddressVerifiedBase(null);
+                              setGeoSuggestions([]);
+                            }}
+                            className="w-5 h-5 rounded-full bg-[#F4F1EC] hover:bg-[#E5E0D8] flex items-center justify-center text-[#78716C] shrink-0 cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+
+                      {addressVerifiedBase && (
+                        <p className="text-[11px] font-medium text-[#78716C] mt-1.5 pl-6 truncate">
+                          {[
+                            addressVerifiedBase.suburb,
+                            addressVerifiedBase.city &&
+                            addressVerifiedBase.state
+                              ? `${addressVerifiedBase.city} - ${addressVerifiedBase.state}`
+                              : addressVerifiedBase.city,
+                            addressVerifiedBase.postcode,
+                          ]
+                            .filter(Boolean)
+                            .join(", ")}
+                        </p>
+                      )}
+
+                      {/* Dropdown de sugestões Geoapify */}
+                      {showGeoDropdown &&
+                        !addressVerifiedBase &&
+                        (geoSuggestions.length > 0 ||
+                          (addressStreetQuery.trim().length >= 3 &&
+                            !loadingGeo)) && (
+                          <ScrollArea
+                            maxHeightClass="max-h-56"
+                            className="mt-2.5 pt-2 border-t border-[#EFECE6] space-y-1"
+                          >
+                            {geoSuggestions.length === 0 ? (
+                              <p className="text-[11px] text-[#78716C] py-2 px-1">
+                                Nenhum endereço encontrado. Tente digitar o nome
+                                da rua com a cidade ou CEP.
+                              </p>
+                            ) : (
+                              geoSuggestions.map((item) => (
+                                <button
+                                  key={item.placeId}
+                                  type="button"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => {
+                                    setAddressStreetQuery(
+                                      item.street || item.line1
+                                    );
+                                    if (
+                                      item.housenumber &&
+                                      !addressNumber.trim()
+                                    ) {
+                                      setAddressNumber(item.housenumber);
+                                    }
+                                    setAddressVerifiedBase({
+                                      street: item.street || item.line1,
+                                      suburb: item.suburb,
+                                      city: item.city,
+                                      state: item.state,
+                                      postcode: item.postcode,
+                                      formatted: item.formatted,
+                                    });
+                                    setShowGeoDropdown(false);
+                                  }}
+                                  className="w-full p-2.5 rounded-xl bg-[#FAF8F5] hover:bg-[#F3EFEA] text-left flex items-start gap-2.5 transition cursor-pointer"
+                                >
+                                  <MapPin className="w-3.5 h-3.5 text-[#111111] shrink-0 mt-0.5" />
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-extrabold text-[#111111] truncate">
+                                      {item.line1}
+                                    </p>
+                                    {item.line2 && (
+                                      <p className="text-[11px] font-medium text-[#78716C] truncate">
+                                        {item.line2}
+                                      </p>
+                                    )}
+                                  </div>
+                                </button>
+                              ))
+                            )}
+                          </ScrollArea>
+                        )}
+                    </div>
+
+                    {/* NÚMERO E COMPLEMENTO */}
+                    <div className="grid grid-cols-5 gap-2.5">
+                      <div className="col-span-2 px-4 py-3.5 rounded-[20px] bg-white shadow-[0_2px_10px_rgba(0,0,0,0.02)] smooth-card">
+                        <label
+                          htmlFor="input-client-address-number"
+                          className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[#78716C] mb-1.5"
+                        >
+                          NÚMERO *
+                        </label>
+                        <input
+                          id="input-client-address-number"
+                          type="text"
+                          required
+                          autoComplete="off"
+                          value={addressNumber}
+                          onChange={(e) => setAddressNumber(e.target.value)}
+                          placeholder="Ex: 120"
+                          className="w-full bg-transparent text-[14px] font-medium text-[#111111] placeholder:text-[#C0B9B0] focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="col-span-3 px-4 py-3.5 rounded-[20px] bg-white shadow-[0_2px_10px_rgba(0,0,0,0.02)] smooth-card">
+                        <label
+                          htmlFor="input-client-address-comp"
+                          className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[#78716C] mb-1.5"
+                        >
+                          COMPLEMENTO (OPCIONAL)
+                        </label>
+                        <input
+                          id="input-client-address-comp"
+                          type="text"
+                          autoComplete="off"
+                          value={addressComplement}
+                          onChange={(e) => setAddressComplement(e.target.value)}
+                          placeholder="Casa, Apto, Referência..."
+                          className="w-full bg-transparent text-[14px] font-medium text-[#111111] placeholder:text-[#C0B9B0] focus:outline-none"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1196,11 +1660,11 @@ function AgendarContent() {
               </button>
             </div>
 
-            <div
+            <ScrollArea
               className={
                 services.length >= 8
-                  ? "space-y-2 flex-1 min-h-0 overflow-y-auto pr-1"
-                  : "space-y-2 max-h-72 overflow-y-auto pr-1"
+                  ? "space-y-2 flex-1 min-h-0"
+                  : "space-y-2 max-h-72"
               }
             >
               {services.map((srv) => {
@@ -1254,7 +1718,7 @@ function AgendarContent() {
                   </button>
                 );
               })}
-            </div>
+            </ScrollArea>
 
             <button
               type="button"
@@ -1463,7 +1927,7 @@ function AgendarContent() {
             )}
 
             {lookupResults !== null && (
-              <div className="space-y-2.5 max-h-72 overflow-y-auto pt-1">
+              <ScrollArea maxHeightClass="max-h-72" className="space-y-2.5 pt-1">
                 {lookupResults.length === 0 ? (
                   <p className="text-xs text-[#78716C] text-center py-4">
                     Nenhum agendamento ativo encontrado para este WhatsApp.
@@ -1502,7 +1966,7 @@ function AgendarContent() {
                     </div>
                   ))
                 )}
-              </div>
+              </ScrollArea>
             )}
       </AnimatedModal>
 
@@ -1626,16 +2090,7 @@ function AgendarContent() {
 
 export default function AgendarPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center p-6">
-          <Loader2 className="w-8 h-8 text-[#111111] animate-spin mb-2" />
-          <p className="text-xs text-[#78716C] uppercase tracking-widest">
-            Carregando Agenda...
-          </p>
-        </div>
-      }
-    >
+    <Suspense fallback={<AgendarSkeleton />}>
       <AgendarContent />
     </Suspense>
   );

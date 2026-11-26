@@ -142,11 +142,43 @@ export default function AdminNotificacoesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center p-6 text-center">
-        <Loader2 className="w-8 h-8 text-[#111111] animate-spin mb-3" />
-        <p className="text-xs font-bold uppercase tracking-widest text-[#78716C]">
-          Carregando Notificações...
-        </p>
+      <div className="min-h-screen bg-[#FAF8F5] text-[#111111] pb-16 font-sans">
+        <div className="max-w-[440px] mx-auto min-h-screen bg-[#FAF8F5] animate-pulse">
+          {/* Header Skeleton */}
+          <header className="sticky top-0 z-30 bg-[#FAF8F5]/95 px-5 pt-5 pb-4 border-b border-[#EFECE6] flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 -ml-1.5 rounded-full bg-[#E8E2D9]" />
+              <div className="space-y-1.5">
+                <div className="h-5 w-44 rounded-lg bg-[#E8E2D9]" />
+                <div className="h-3 w-20 rounded bg-[#EDE8E0]" />
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="h-8 w-20 rounded-xl bg-[#EDE8E0]" />
+              <div className="h-8 w-8 rounded-xl bg-[#EDE8E0]" />
+            </div>
+          </header>
+
+          <main className="px-5 pt-5 space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className="p-4 rounded-[22px] bg-white border border-[#EFECE6] flex items-center justify-between gap-3"
+              >
+                <div className="space-y-2 flex-1">
+                  <div className="flex items-center gap-2">
+                    <div className="h-4 w-28 rounded-full bg-[#EDE8E0]" />
+                    <div className="h-3 w-10 rounded bg-[#F3EFEA]" />
+                  </div>
+                  <div className="h-4 w-40 rounded bg-[#E8E2D9]" />
+                  <div className="h-3 w-32 rounded bg-[#F3EFEA]" />
+                  <div className="h-3 w-24 rounded bg-[#EDE8E0]" />
+                </div>
+                <div className="w-9 h-9 rounded-xl bg-[#F4F1EC] shrink-0" />
+              </div>
+            ))}
+          </main>
+        </div>
       </div>
     );
   }

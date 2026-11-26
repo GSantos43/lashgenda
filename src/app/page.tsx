@@ -235,10 +235,36 @@ export default function LinktreeHomePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#18181B] flex flex-col items-center justify-center p-6">
-        <div className="w-12 h-12 rounded-xl bg-[#FAF7F2] shadow-lg flex items-center justify-center border border-[#C5A880]">
-          <Loader2 className="w-6 h-6 text-[#18181B] animate-spin" />
-        </div>
+      <div className="min-h-screen w-full bg-[#18181B] bg-gradient-to-b from-[#18181B] via-[#1f1d1b] to-[#18181B] flex justify-center items-start sm:py-8 px-0 sm:px-4 font-sans">
+        <main className="w-full max-w-[560px] min-h-screen sm:min-h-[820px] bg-[#FAF7F2] sm:rounded-2xl sm:border sm:border-[#C5A880]/40 px-4 sm:px-6 pt-6 pb-14 flex flex-col items-center animate-pulse">
+          {/* Top Share Button Skeleton */}
+          <div className="w-full flex justify-end mb-1">
+            <div className="w-9 h-9 rounded-lg bg-[#EDE8E0]" />
+          </div>
+
+          {/* Avatar Skeleton */}
+          <div className="w-24 h-24 rounded-full bg-[#E8E2D9] mb-3.5 shrink-0" />
+
+          {/* Title Skeleton */}
+          <div className="h-5 w-44 rounded-lg bg-[#E8E2D9]" />
+
+          {/* Social Icons Row Skeleton */}
+          <div className="flex items-center justify-center gap-3.5 mt-3 mb-7">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="w-9 h-9 rounded-lg bg-[#FCEEEF]" />
+            ))}
+          </div>
+
+          {/* Linktree Buttons Skeleton */}
+          <div className="w-full space-y-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="w-full min-h-[58px] rounded-xl bg-[#E8E2D9]"
+              />
+            ))}
+          </div>
+        </main>
       </div>
     );
   }

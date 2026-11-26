@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { DatePicker } from "@/components/DatePicker";
 import { AnimatedModal } from "@/components/AnimatedModal";
+import { ScrollArea } from "@/components/ScrollArea";
 
 interface AdminConfig {
   id: number;
@@ -199,6 +200,38 @@ function formatDatePillLabel(dateStr: string, todayStr: string): string {
   const { day, monthIndex } = parseDateParts(dateStr);
   const isToday = dateStr === todayStr;
   return `${day} ${MONTHS_SHORT_PT[monthIndex]}${isToday ? ", Hoje" : ""}`;
+}
+
+function AdminThumbImage({
+  src,
+  alt,
+  className = "w-12 h-12 rounded-2xl",
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const [errored, setErrored] = useState(false);
+
+  return (
+    <div
+      className={`${className} overflow-hidden shrink-0 bg-[#F4F1EC] relative`}
+    >
+      {!loaded && !errored && (
+        <div className="absolute inset-0 bg-[#E8E2D9] animate-pulse" />
+      )}
+      <img
+        src={src}
+        alt={alt}
+        onLoad={() => setLoaded(true)}
+        onError={() => setErrored(true)}
+        className={`w-full h-full object-cover transition-opacity duration-300 ${
+          loaded ? "opacity-100" : "opacity-0"
+        }`}
+      />
+    </div>
+  );
 }
 
 export default function AdminDashboardPage() {
@@ -799,11 +832,91 @@ export default function AdminDashboardPage() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center p-6 text-center">
-        <Loader2 className="w-8 h-8 text-[#111111] animate-spin mb-3" />
-        <p className="text-xs font-bold uppercase tracking-widest text-[#78716C]">
-          Carregando Painel Executivo...
-        </p>
+      <div className="min-h-dvh bg-[#FAF8F5] text-[#111111] font-sans">
+        <div className="max-w-[440px] mx-auto min-h-dvh flex flex-col bg-[#FAF8F5] relative pb-22 animate-pulse">
+          {/* Executive Header Skeleton */}
+          <header className="px-5 pt-5 pb-4 border-b border-[#EFECE6] flex items-center justify-between">
+            <div className="space-y-1.5">
+              <div className="h-4 w-28 rounded-lg bg-[#E8E2D9]" />
+              <div className="h-2.5 w-24 rounded bg-[#EDE8E0]" />
+            </div>
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-full bg-[#EDE8E0]" />
+              <div className="w-10 h-10 rounded-full bg-[#EDE8E0]" />
+              <div className="w-10 h-10 rounded-full bg-[#E8E2D9]" />
+            </div>
+          </header>
+
+          <main className="px-5 pt-5 flex-1 flex flex-col">
+            {/* Greeting & Date Skeleton */}
+            <div className="space-y-2">
+              <div className="h-3.5 w-24 rounded bg-[#EDE8E0]" />
+              <div className="h-7 w-56 rounded-lg bg-[#E8E2D9]" />
+            </div>
+
+            {/* Resumo de Hoje Card Skeleton */}
+            <div className="mt-6 p-4 rounded-[26px] bg-white shadow-[0_4px_20px_rgba(0,0,0,0.02)] space-y-3.5">
+              <div className="flex items-center justify-between px-1">
+                <div className="h-3 w-28 rounded bg-[#EDE8E0]" />
+                <div className="h-3 w-24 rounded bg-[#EDE8E0]" />
+              </div>
+              <div className="grid grid-cols-3 gap-2.5">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="p-3.5 rounded-[20px] bg-[#E8E2D9] min-h-[108px] flex flex-col justify-between"
+                  >
+                    <div className="h-2.5 w-14 rounded bg-[#D6CFC5]" />
+                    <div className="h-5 w-16 rounded bg-[#D6CFC5]" />
+                    <div className="h-2.5 w-16 rounded bg-[#D6CFC5]" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Agenda Completa Skeleton */}
+            <div className="mt-6 flex-1 flex flex-col space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="h-5 w-36 rounded-lg bg-[#E8E2D9]" />
+                <div className="h-8 w-28 rounded-full bg-white border border-[#E5E0D8]" />
+              </div>
+              <div className="space-y-2.5 flex-1">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="p-4 rounded-[22px] bg-white flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="h-4 w-11 rounded bg-[#E8E2D9]" />
+                      <div className="space-y-2 flex-1">
+                        <div className="h-4 w-36 rounded bg-[#E8E2D9]" />
+                        <div className="h-3 w-44 rounded bg-[#F3EFEA]" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Action Buttons Skeleton */}
+            <div className="grid grid-cols-2 gap-3 mt-5 pt-1">
+              <div className="h-[52px] rounded-[20px] bg-[#E2DDD5]" />
+              <div className="h-[52px] rounded-[20px] bg-white border border-[#E5E0D8]" />
+            </div>
+          </main>
+
+          {/* Bottom Nav Skeleton */}
+          <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 border-t border-[#EFECE6]">
+            <div className="max-w-[440px] mx-auto px-6 pt-2.5 pb-3.5 flex items-center justify-between">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex flex-col items-center gap-1.5 py-1.5 px-3">
+                  <div className="w-5 h-5 rounded bg-[#E8E2D9]" />
+                  <div className="h-2.5 w-12 rounded bg-[#EDE8E0]" />
+                </div>
+              ))}
+            </div>
+          </nav>
+        </div>
       </div>
     );
   }
@@ -1133,7 +1246,36 @@ export default function AdminDashboardPage() {
               }`}
             >
               <div className="overflow-hidden">
-                {homeDisplayMode === "clientes" ? (
+                {isRefreshingPull ? (
+                  homeDisplayMode === "clientes" ? (
+                    <section className="px-5 py-5 rounded-[24px] bg-[#141519] shadow-[0_4px_20px_rgba(0,0,0,0.06)] flex flex-col justify-center gap-2.5 animate-pulse">
+                      <div className="h-3 w-28 rounded bg-white/15" />
+                      <div className="flex items-center gap-2">
+                        <div className="h-6 w-8 rounded bg-[#10B981]/30" />
+                        <div className="h-5 w-32 rounded bg-white/20" />
+                      </div>
+                    </section>
+                  ) : (
+                    <section className="p-4 rounded-[26px] bg-white shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-3.5 animate-pulse">
+                      <div className="flex items-center justify-between px-1">
+                        <div className="h-3 w-28 rounded bg-[#EDE8E0]" />
+                        <div className="h-3 w-24 rounded bg-[#EDE8E0]" />
+                      </div>
+                      <div className="grid grid-cols-3 gap-2.5">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="p-3.5 rounded-[20px] bg-[#141519] flex flex-col justify-between min-h-[108px]"
+                          >
+                            <div className="h-2.5 w-14 rounded bg-white/15" />
+                            <div className="h-5 w-16 rounded bg-white/25 my-1" />
+                            <div className="h-2.5 w-16 rounded bg-white/15" />
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )
+                ) : homeDisplayMode === "clientes" ? (
                   <section className="px-5 py-5 rounded-[24px] bg-[#141519] text-white shadow-[0_4px_20px_rgba(0,0,0,0.06)] flex flex-col justify-center gap-2.5 smooth-card">
                     <span className="block text-[11px] font-extrabold uppercase tracking-[0.1em] text-[#A1A1AA] leading-none">
                       RESUMO DE HOJE
@@ -1231,7 +1373,25 @@ export default function AdminDashboardPage() {
                 />
               </div>
 
-              {dailyAppointments.length === 0 ? (
+              {isRefreshingPull ? (
+                <div className="space-y-2.5 flex-1 animate-pulse">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="p-4 rounded-[22px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.025)] flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-4 flex-1">
+                        <div className="h-4 w-11 rounded bg-[#E8E2D9] shrink-0" />
+                        <div className="space-y-2 flex-1">
+                          <div className="h-4 w-36 rounded bg-[#E8E2D9]" />
+                          <div className="h-3 w-44 rounded bg-[#F3EFEA]" />
+                        </div>
+                      </div>
+                      <div className="h-6 w-20 rounded-full bg-[#F4F1EC] shrink-0" />
+                    </div>
+                  ))}
+                </div>
+              ) : dailyAppointments.length === 0 ? (
                 <div className="flex-1 min-h-[150px] p-8 rounded-[24px] bg-white border border-[#EFECE6] flex flex-col items-center justify-center text-center space-y-2 shadow-2xs animate-card">
                   <p className="text-sm font-bold text-[#111111]">
                     Nenhum cliente agendado neste dia
@@ -1258,12 +1418,14 @@ export default function AdminDashboardPage() {
                             <div
                               key={appt.id}
                               style={{ animationDelay: `${100 + idx * 45}ms` }}
-                              onClick={() => setSelectedAppointment(appt)}
+                              onClick={() =>
+                                router.push(`/atendimento/${appt.id}`)
+                              }
                               role="button"
                               tabIndex={0}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter" || e.key === " ")
-                                  setSelectedAppointment(appt);
+                                  router.push(`/atendimento/${appt.id}`);
                               }}
                               className="p-4 rounded-[22px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.025)] flex items-center justify-between gap-3 cursor-pointer relative overflow-hidden animate-card smooth-card"
                             >
@@ -1319,12 +1481,14 @@ export default function AdminDashboardPage() {
                             <div
                               key={appt.id}
                               style={{ animationDelay: `${160 + idx * 45}ms` }}
-                              onClick={() => setSelectedAppointment(appt)}
+                              onClick={() =>
+                                router.push(`/atendimento/${appt.id}`)
+                              }
                               role="button"
                               tabIndex={0}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter" || e.key === " ")
-                                  setSelectedAppointment(appt);
+                                  router.push(`/atendimento/${appt.id}`);
                               }}
                               className="p-4 rounded-[22px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.025)] flex items-center justify-between gap-3 cursor-pointer relative overflow-hidden animate-card smooth-card"
                             >
@@ -1433,7 +1597,26 @@ export default function AdminDashboardPage() {
             </div>
 
             <div className="space-y-2.5">
-              {services.map((srv, idx) => (
+              {isRefreshingPull
+                ? Array.from({ length: 5 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="p-3.5 rounded-[22px] bg-white shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex items-center justify-between gap-3 animate-pulse"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="w-12 h-12 rounded-2xl bg-[#E8E2D9] shrink-0" />
+                        <div className="space-y-2 flex-1">
+                          <div className="h-3.5 w-36 rounded bg-[#E8E2D9]" />
+                          <div className="h-3 w-20 rounded bg-[#F3EFEA]" />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="w-9 h-9 rounded-xl bg-[#F4F1EC]" />
+                        <div className="w-9 h-9 rounded-xl bg-red-50" />
+                      </div>
+                    </div>
+                  ))
+                : services.map((srv, idx) => (
                 <div
                   key={srv.id}
                   style={{ animationDelay: `${idx * 35}ms` }}
@@ -1448,11 +1631,7 @@ export default function AdminDashboardPage() {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     {srv.imageUrl && (
-                      <img
-                        src={srv.imageUrl}
-                        alt={srv.name}
-                        className="w-12 h-12 rounded-2xl object-cover shrink-0 bg-[#F4F1EC]"
-                      />
+                      <AdminThumbImage src={srv.imageUrl} alt={srv.name} />
                     )}
                     <div className="min-w-0">
                       <p className="text-sm font-extrabold text-[#111111] truncate">
@@ -2311,12 +2490,14 @@ export default function AdminDashboardPage() {
                               return (
                                 <div
                                   key={appt.id}
-                                  onClick={() => setSelectedAppointment(appt)}
+                                  onClick={() =>
+                                    router.push(`/atendimento/${appt.id}`)
+                                  }
                                   role="button"
                                   tabIndex={0}
                                   onKeyDown={(e) => {
                                     if (e.key === "Enter" || e.key === " ")
-                                      setSelectedAppointment(appt);
+                                      router.push(`/atendimento/${appt.id}`);
                                   }}
                                   className="p-3.5 rounded-2xl bg-[#FAF8F5] hover:bg-[#F3EFEA] border border-[#EFECE6] flex items-center justify-between gap-3 cursor-pointer smooth-card"
                                 >
@@ -3457,7 +3638,7 @@ export default function AdminDashboardPage() {
             Nenhuma notificação recente.
           </p>
         ) : (
-          <div className="space-y-2.5 flex-1 min-h-0 overflow-y-auto pr-1">
+          <ScrollArea className="space-y-2.5 flex-1 min-h-0">
             {whatsappEvents.map((ev, idx) => {
               const isRead = Boolean(ev.read);
               return (
@@ -3523,7 +3704,7 @@ export default function AdminDashboardPage() {
                 </div>
               );
             })}
-          </div>
+          </ScrollArea>
         )}
 
         <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#F0ECE6] shrink-0">

@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   Clock,
+  ExternalLink,
   FileText,
   Loader2,
   MapPin,
@@ -182,11 +183,79 @@ export default function AtendimentoDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center p-6 text-center">
-        <Loader2 className="w-8 h-8 text-[#111111] animate-spin mb-3" />
-        <p className="text-xs font-bold uppercase tracking-widest text-[#78716C]">
-          Carregando Atendimento...
-        </p>
+      <div className="min-h-screen bg-[#FAF8F5] text-[#111111] pb-16 font-sans">
+        <div className="max-w-[440px] mx-auto min-h-screen bg-[#FAF8F5] animate-pulse">
+          {/* Header Skeleton */}
+          <header className="sticky top-0 z-30 bg-[#FAF8F5]/95 px-5 pt-5 pb-4 border-b border-[#EFECE6] flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 -ml-1.5 rounded-full bg-[#E8E2D9]" />
+              <div className="space-y-1.5">
+                <div className="h-2.5 w-24 rounded bg-[#EDE8E0]" />
+                <div className="h-5 w-44 rounded-lg bg-[#E8E2D9]" />
+              </div>
+            </div>
+            <div className="h-7 w-20 rounded-full bg-[#EADCE0]/70" />
+          </header>
+
+          <main className="px-5 pt-5 space-y-4">
+            {/* Highlight Card Skeleton */}
+            <section className="p-5 rounded-[26px] bg-white shadow-[0_4px_20px_rgba(0,0,0,0.02)] space-y-4">
+              <div className="flex items-start justify-between gap-3 pb-4 border-b border-[#F2EFE9]">
+                <div className="space-y-2 flex-1">
+                  <div className="h-2.5 w-24 rounded bg-[#EDE8E0]" />
+                  <div className="h-5 w-44 rounded-lg bg-[#E8E2D9]" />
+                  <div className="h-3.5 w-36 rounded bg-[#F3EFEA]" />
+                </div>
+                <div className="space-y-2 text-right">
+                  <div className="h-2.5 w-12 rounded bg-[#EDE8E0] ml-auto" />
+                  <div className="h-6 w-20 rounded-lg bg-[#E8E2D9]" />
+                </div>
+              </div>
+
+              <div className="space-y-3.5">
+                {/* Data & Horário Skeleton */}
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-[#FAF8F5] border border-[#EFECE6] shrink-0" />
+                  <div className="space-y-1.5 flex-1">
+                    <div className="h-2.5 w-24 rounded bg-[#EDE8E0]" />
+                    <div className="h-4 w-40 rounded bg-[#E8E2D9]" />
+                  </div>
+                </div>
+
+                {/* Cliente Skeleton */}
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-2xl bg-[#FAF8F5] border border-[#EFECE6] shrink-0" />
+                  <div className="space-y-1.5 flex-1">
+                    <div className="h-2.5 w-16 rounded bg-[#EDE8E0]" />
+                    <div className="h-4 w-36 rounded bg-[#E8E2D9]" />
+                    <div className="h-3 w-28 rounded bg-[#F3EFEA]" />
+                  </div>
+                </div>
+
+                {/* Endereço + Mapa Skeleton */}
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-10 h-10 rounded-2xl bg-[#FAF8F5] border border-[#EFECE6] shrink-0" />
+                    <div className="space-y-1.5 flex-1">
+                      <div className="h-2.5 w-40 rounded bg-[#EDE8E0]" />
+                      <div className="h-4 w-52 rounded bg-[#E8E2D9]" />
+                    </div>
+                  </div>
+                  <div className="w-full h-44 rounded-2xl bg-[#F3EFEA] border border-[#EFECE6]" />
+                </div>
+              </div>
+            </section>
+
+            {/* Action Buttons Skeleton */}
+            <div className="space-y-2.5">
+              <div className="h-[52px] w-full rounded-[20px] bg-[#D8F3DC]/70" />
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="h-[52px] rounded-[20px] bg-[#E2DDD5]" />
+                <div className="h-[52px] rounded-[20px] bg-[#F3EFEA]" />
+              </div>
+            </div>
+          </main>
+        </div>
       </div>
     );
   }
@@ -249,7 +318,7 @@ export default function AtendimentoDetailPage() {
 
           {/* Status Pill */}
           <span
-            className={`px-3 py-1.5 rounded-full text-[11px] font-extrabold uppercase tracking-wide ${
+            className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider shrink-0 ${
               isCompleted
                 ? "bg-emerald-100 text-emerald-800"
                 : isCanceled
@@ -276,10 +345,6 @@ export default function AtendimentoDetailPage() {
                 <h2 className="text-[18px] font-extrabold text-[#111111] leading-snug">
                   {appointment.serviceName}
                 </h2>
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#78716C]">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>Duração estimada: {appointment.duration}</span>
-                </span>
               </div>
 
               <div className="text-right shrink-0">
@@ -331,19 +396,49 @@ export default function AtendimentoDetailPage() {
                 </div>
               </div>
 
-              {/* Endereço Domicílio */}
+              {/* Endereço Domicílio + Mapa Google Maps */}
               {appointment.clientAddress && (
-                <div className="flex items-start gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-[#FAF8F5] border border-[#EFECE6] flex items-center justify-center shrink-0">
-                    <MapPin className="w-4 h-4 text-[#111111]" />
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3.5 min-w-0">
+                      <div className="w-10 h-10 rounded-2xl bg-[#FAF8F5] border border-[#EFECE6] flex items-center justify-center shrink-0">
+                        <MapPin className="w-4 h-4 text-[#111111]" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[#78716C]">
+                          ENDEREÇO (ATENDIMENTO A DOMICÍLIO)
+                        </span>
+                        <p className="text-sm font-semibold text-[#111111] mt-0.5 leading-snug">
+                          {appointment.clientAddress}
+                        </p>
+                      </div>
+                    </div>
+
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                        appointment.clientAddress
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-2 rounded-xl bg-[#FAF8F5] hover:bg-[#F3EFEA] border border-[#EFECE6] text-[#111111] text-[11px] font-bold inline-flex items-center gap-1.5 shrink-0 smooth-press"
+                    >
+                      <span>Abrir Rota</span>
+                      <ExternalLink className="w-3.5 h-3.5 text-[#78716C]" />
+                    </a>
                   </div>
-                  <div>
-                    <span className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[#78716C]">
-                      ENDEREÇO (ATENDIMENTO A DOMICÍLIO)
-                    </span>
-                    <p className="text-sm font-semibold text-[#111111] mt-0.5 leading-snug">
-                      {appointment.clientAddress}
-                    </p>
+
+                  <div className="w-full h-64 rounded-2xl overflow-hidden border border-[#EFECE6] bg-[#FAF8F5] shadow-2xs">
+                    <iframe
+                      title={`Mapa para ${appointment.clientAddress}`}
+                      src={`https://maps.google.com/maps?q=${encodeURIComponent(
+                        appointment.clientAddress
+                      )}&t=&z=16&ie=UTF8&iwloc=&output=embed`}
+                      width="100%"
+                      height="100%"
+                      style={{ border: 0 }}
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                    />
                   </div>
                 </div>
               )}
@@ -393,7 +488,7 @@ export default function AtendimentoDetailPage() {
                     .join("/")}* às *${appointment.time}*.`
                 )
               }
-              className="w-full py-4 px-5 rounded-[20px] bg-[#D8F3DC] hover:bg-[#c7ebd0] border border-[#b7e4c7] text-[#111111] font-extrabold text-xs flex items-center justify-center gap-2 shadow-2xs smooth-press cursor-pointer"
+              className="w-full py-4 px-5 rounded-[20px] bg-[#059669] hover:bg-[#047857] text-[#D8F3DC] font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm smooth-press cursor-pointer"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -402,7 +497,7 @@ export default function AtendimentoDetailPage() {
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="w-4 h-4 text-[#059669]"
+                className="w-4 h-4 text-[#D8F3DC]"
               >
                 <path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" />
                 <path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1a5 5 0 0 0 5 5h1a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1" />
@@ -494,17 +589,47 @@ export default function AtendimentoDetailPage() {
           </button>
         </div>
 
-        <div className="p-4 rounded-2xl bg-[#F4F1EC] text-xs space-y-1.5">
-          <p>
-            <b>Cliente:</b> {appointment.clientName}
-          </p>
-          <p>
-            <b>Procedimento:</b> {appointment.serviceName}
-          </p>
-          <p>
-            <b>Data:</b> {appointment.date.split("-").reverse().join("/")} às{" "}
-            {appointment.time}
-          </p>
+        <div className="p-5 rounded-[22px] bg-[#F4F1EC] border border-[#E8E2D9] space-y-4">
+          <div className="flex items-start justify-between gap-3 pb-3.5 border-b border-[#E5DFD5]">
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[#78716C]">
+                PROCEDIMENTO
+              </span>
+              <h4 className="text-[16px] font-extrabold text-[#111111] mt-0.5">
+                {appointment.serviceName}
+              </h4>
+            </div>
+            <span className="text-[17px] font-extrabold text-[#111111] shrink-0">
+              {formatBRL(appointment.price)}
+            </span>
+          </div>
+
+          <div className="space-y-3.5">
+            <div className="flex items-center gap-3">
+              <Calendar className="w-4 h-4 text-[#111111] shrink-0 stroke-[2]" />
+              <div>
+                <span className="block text-[9px] font-bold uppercase tracking-[0.08em] text-[#78716C]">
+                  DATA & HORÁRIO
+                </span>
+                <p className="text-[13px] font-semibold text-[#111111]">
+                  {formatFullDatePT(appointment.date)} - {appointment.time}h
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <User className="w-4 h-4 text-[#111111] shrink-0 stroke-[2]" />
+              <div>
+                <span className="block text-[9px] font-bold uppercase tracking-[0.08em] text-[#78716C]">
+                  CLIENTE
+                </span>
+                <p className="text-[13px] font-semibold text-[#111111]">
+                  {appointment.clientName} •{" "}
+                  {formatPhoneBR(appointment.clientPhone)}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="space-y-2.5 pt-1">

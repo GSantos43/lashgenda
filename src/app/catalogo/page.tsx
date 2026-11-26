@@ -33,6 +33,58 @@ interface ServiceItem {
   featured: boolean;
 }
 
+function CatalogoServiceCardSkeleton() {
+  return (
+    <div className="p-4 rounded-[24px] bg-white shadow-[0_2px_14px_rgba(0,0,0,0.025)] space-y-3.5 animate-pulse">
+      <div className="flex items-start gap-3.5">
+        {/* 80x80 Photo Skeleton */}
+        <div className="w-20 h-20 rounded-2xl bg-[#E8E2D9] shrink-0" />
+
+        <div className="flex-1 min-w-0 space-y-2 pt-0.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="h-2.5 w-24 rounded bg-[#EDE8E0]" />
+            <div className="h-4 w-16 rounded-full bg-[#EADCE0]/80" />
+          </div>
+          <div className="h-4 w-40 rounded-lg bg-[#E8E2D9]" />
+          <div className="h-4 w-20 rounded-lg bg-[#E8E2D9]" />
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="h-3 w-full rounded bg-[#F3EFEA]" />
+        <div className="h-3 w-4/5 rounded bg-[#F3EFEA]" />
+      </div>
+
+      <div className="flex items-center gap-2 pt-0.5">
+        <div className="h-11 flex-1 rounded-[16px] bg-[#E2DDD5]" />
+        <div className="h-11 w-24 rounded-[16px] bg-[#F3EFEA]" />
+      </div>
+    </div>
+  );
+}
+
+function CatalogPhoto({ src, alt }: { src: string; alt: string }) {
+  const [loaded, setLoaded] = useState(false);
+  const [errored, setErrored] = useState(false);
+
+  return (
+    <div className="w-20 h-20 rounded-2xl overflow-hidden bg-[#F3EFEA] shrink-0 relative">
+      {!loaded && !errored && (
+        <div className="absolute inset-0 bg-[#E8E2D9] animate-pulse" />
+      )}
+      <img
+        src={src}
+        alt={alt}
+        onLoad={() => setLoaded(true)}
+        onError={() => setErrored(true)}
+        className={`w-full h-full object-cover transition-opacity duration-300 ${
+          loaded ? "opacity-100" : "opacity-0"
+        }`}
+      />
+    </div>
+  );
+}
+
 export default function CatalogoPage() {
   const router = useRouter();
   const pathname = usePathname();
@@ -110,11 +162,44 @@ export default function CatalogoPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center p-6 text-center">
-        <Loader2 className="w-8 h-8 text-[#111111] animate-spin mb-3" />
-        <p className="text-xs font-bold text-[#78716C] uppercase tracking-wider">
-          Carregando Catálogo de Procedimentos...
-        </p>
+      <div className="min-h-screen bg-[#FAF8F5] text-[#111111] pb-16 font-sans">
+        <div className="max-w-[440px] mx-auto min-h-screen bg-[#FAF8F5] animate-pulse">
+          {/* Header Skeleton */}
+          <header className="sticky top-0 z-30 bg-[#FAF8F5]/95 px-6 py-5 border-b border-[#EFECE6] flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 -ml-2 rounded-full bg-[#E8E2D9]" />
+              <div className="h-6 w-28 rounded-lg bg-[#E8E2D9]" />
+            </div>
+            <div className="h-10 w-28 rounded-full bg-[#E2DDD5]" />
+          </header>
+
+          <main className="px-5 pt-4 space-y-5">
+            {/* Intro Banner Skeleton */}
+            <div className="p-5 rounded-[24px] bg-[#EADCE0]/70 space-y-2.5">
+              <div className="h-3 w-40 rounded bg-[#C9B3B9]" />
+              <div className="h-5 w-52 rounded-lg bg-[#C9B3B9]" />
+              <div className="h-3 w-full rounded bg-[#D8C5CA]" />
+              <div className="h-3 w-4/5 rounded bg-[#D8C5CA]" />
+            </div>
+
+            {/* Search & Category Pills Skeleton */}
+            <div className="space-y-3">
+              <div className="h-12 w-full rounded-2xl bg-white border border-[#E5E0D8]" />
+              <div className="flex gap-2 overflow-hidden">
+                <div className="h-9 w-20 rounded-full bg-[#D6CFC5] shrink-0" />
+                <div className="h-9 w-36 rounded-full bg-[#EDE8E0] shrink-0" />
+                <div className="h-9 w-28 rounded-full bg-[#EDE8E0] shrink-0" />
+              </div>
+            </div>
+
+            {/* Procedure Cards Skeleton (exact match to item layout + photo) */}
+            <div className="space-y-3.5">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <CatalogoServiceCardSkeleton key={i} />
+              ))}
+            </div>
+          </main>
+        </div>
       </div>
     );
   }
@@ -234,13 +319,7 @@ export default function CatalogoPage() {
                   >
                     <div className="flex items-start gap-3.5">
                       {srv.imageUrl && (
-                        <div className="w-20 h-20 rounded-2xl overflow-hidden bg-[#F3EFEA] shrink-0">
-                          <img
-                            src={srv.imageUrl}
-                            alt={srv.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
+                        <CatalogPhoto src={srv.imageUrl} alt={srv.name} />
                       )}
 
                       <div className="flex-1 min-w-0">
