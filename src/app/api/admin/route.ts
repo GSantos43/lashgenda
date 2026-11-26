@@ -296,7 +296,15 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "create_manual_appointment") {
-      const { serviceId, date, time, clientName, clientPhone, clientNotes } = body;
+      const {
+        serviceId,
+        date,
+        time,
+        clientName,
+        clientPhone,
+        clientAddress,
+        clientNotes,
+      } = body;
       const service = await prisma.service.findUnique({
         where: { id: Number(serviceId) },
       });
@@ -313,6 +321,7 @@ export async function POST(req: NextRequest) {
           time,
           clientName: clientName.trim(),
           clientPhone: normalizePhone(clientPhone),
+          clientAddress: (clientAddress || "").trim(),
           clientNotes: clientNotes || "",
           status: "agendado",
         },

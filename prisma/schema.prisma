@@ -9,14 +9,14 @@ datasource db {
 
 model StudioConfig {
   id                  Int      @id @default(1)
-  studioName          String   @default("Bella Lash Studio")
+  studioName          String   @default("Isabele Lash")
   professionalName    String   @default("Camila Andrade")
   tagline             String   @default("Especialista em Extensão de Cílios & Olhar Marcante ✨")
   bio                 String   @default("Realçando sua beleza natural com técnicas exclusivas, saúde ocular e durabilidade impecável.")
   address             String   @default("Av. Paulista, 1000 - Sala 402, Jardins - São Paulo/SP")
-  whatsapp            String   @default("11999999999")
+  whatsapp            String   @default("5577988350460")
   instagram           String   @default("@bellalash.studio")
-  logoUrl             String   @default("https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&auto=format&fit=crop&q=80")
+  logoUrl             String   @default("/isa.png")
   coverUrl            String   @default("https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=1000&auto=format&fit=crop&q=80")
   badgesJson          String   @default("[\"❄️ Ambiente Climatizado\", \"☕ Café & Espumante\", \"📶 Wi-Fi Grátis\", \"✨ Materiais Premium\"]")
   themeMode           String   @default("dark-rose") // "dark-rose", "light-rose", "gold-luxury"
@@ -67,6 +67,7 @@ model Appointment {
   time          String   // HH:mm
   clientName    String
   clientPhone   String   // normalized digits e.g. 11988887777
+  clientAddress String   @default("")
   clientNotes   String   @default("")
   status        String   @default("agendado") // "agendado", "concluido", "cancelado"
   cancelReason  String   @default("")

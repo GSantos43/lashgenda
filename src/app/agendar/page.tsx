@@ -1,22 +1,36 @@
 "use client";
 
-import React, { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import React, { Suspense, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowLeft,
+  ChevronLeft,
   Calendar,
   Clock,
   CheckCircle2,
   Loader2,
   MessageCircle,
-  Sparkles,
   User,
-  Phone,
   AlertCircle,
   Search,
   XCircle,
-  BookOpen,
+  Pencil,
+  Sunrise,
+  Sun,
+  Moon,
+  IdCard,
+  MessageSquare,
+  PenLine,
+  CalendarCheck,
+  ArrowRight,
+  X,
+  ListChecks,
+  Check,
+  Smile,
+  Sparkles,
+  MapPin,
 } from "lucide-react";
+import { DatePicker } from "@/components/DatePicker";
+import { AnimatedModal } from "@/components/AnimatedModal";
 
 interface StudioConfig {
   studioName: string;
@@ -56,8 +70,59 @@ interface ClientAppointment {
   time: string;
   clientName: string;
   clientPhone: string;
+  clientAddress?: string;
   status: string;
 }
+
+const MONTHS_PT = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
+const MONTHS_SHORT_PT = [
+  "Jan",
+  "Fev",
+  "Mar",
+  "Abr",
+  "Mai",
+  "Jun",
+  "Jul",
+  "Ago",
+  "Set",
+  "Out",
+  "Nov",
+  "Dez",
+];
+
+const WEEKDAYS_PT = [
+  "Domingo",
+  "Segunda-feira",
+  "Terça-feira",
+  "Quarta-feira",
+  "Quinta-feira",
+  "Sexta-feira",
+  "Sábado",
+];
+
+const WEEKDAYS_SHORT_PT = [
+  "Domingo",
+  "Segunda",
+  "Terça",
+  "Quarta",
+  "Quinta",
+  "Sexta",
+  "Sábado",
+];
 
 function getTodayBrazil(): string {
   const now = new Date();
@@ -70,22 +135,80 @@ function getTodayBrazil(): string {
   return fmt.format(now);
 }
 
+function parseDateParts(dateStr: string) {
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return {
+      day: 22,
+      monthIndex: 9,
+      year: 2024,
+      weekdayIndex: 2,
+    };
+  }
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, (m || 1) - 1, d || 1);
+  return {
+    day: d,
+    monthIndex: (m || 1) - 1,
+    year: y,
+    weekdayIndex: dt.getDay(),
+  };
+}
+
+function formatMonthYearUpper(dateStr: string): string {
+  const { monthIndex, year } = parseDateParts(dateStr);
+  return `${MONTHS_PT[monthIndex].toUpperCase()} ${year}`;
+}
+
+function formatLongDateChip(dateStr: string): string {
+  const { day, monthIndex, weekdayIndex } = parseDateParts(dateStr);
+  return `${day} de ${MONTHS_PT[monthIndex]} • ${WEEKDAYS_PT[weekdayIndex]}`;
+}
+
+function formatShortSubtitleDate(dateStr: string): string {
+  const { day, monthIndex, weekdayIndex } = parseDateParts(dateStr);
+  return `${WEEKDAYS_SHORT_PT[weekdayIndex]}, ${day} de ${MONTHS_SHORT_PT[monthIndex]}`;
+}
+
+function formatModalDateAndTime(dateStr: string, timeStr: string): string {
+  const { day, monthIndex, weekdayIndex } = parseDateParts(dateStr);
+  return `${WEEKDAYS_SHORT_PT[weekdayIndex]}, ${day} de ${MONTHS_PT[monthIndex]} às ${timeStr}`;
+}
+
+function formatPhoneMask(val: string): string {
+  const digits = val.replace(/\D/g, "").slice(0, 11);
+  if (digits.length === 0) return "";
+  if (digits.length <= 2) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
 function AgendarContent() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
+  const dateInputRef = useRef<HTMLInputElement | null>(null);
+  const [enterKey, setEnterKey] = useState(0);
+
+  useEffect(() => {
+    setEnterKey((k) => k + 1);
+  }, [pathname]);
 
   const [initialLoading, setInitialLoading] = useState(true);
-  const [navigatingBack, setNavigatingBack] = useState(false);
   const [config, setConfig] = useState<StudioConfig | null>(null);
   const [services, setServices] = useState<ServiceItem[]>([]);
 
   // Form states
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
+  const [showServicePicker, setShowServicePicker] = useState<boolean>(false);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [todayMinDate, setTodayMinDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [clientName, setClientName] = useState<string>("");
   const [clientPhone, setClientPhone] = useState<string>("");
+  const [clientAddress, setClientAddress] = useState<string>("");
   const [clientNotes, setClientNotes] = useState<string>("");
 
   // Slots loading state
@@ -94,28 +217,31 @@ function AgendarContent() {
   const [isFullDayBlocked, setIsFullDayBlocked] = useState<boolean>(false);
   const [blockReason, setBlockReason] = useState<string>("");
 
+  // Review modal state (Figma node 1-2)
+  const [showReviewModal, setShowReviewModal] = useState<boolean>(false);
+
   // Booking submission state
   const [submittingBooking, setSubmittingBooking] = useState<boolean>(false);
   const [bookingError, setBookingError] = useState<string>("");
-  const [bookingSuccess, setBookingSuccess] = useState<ClientAppointment | null>(
-    null
-  );
+  const [bookingSuccess, setBookingSuccess] =
+    useState<ClientAppointment | null>(null);
 
   // Lookup / Cancel existing appointments modal state
   const [showLookupModal, setShowLookupModal] = useState<boolean>(false);
   const [lookupPhone, setLookupPhone] = useState<string>("");
   const [loadingLookup, setLoadingLookup] = useState<boolean>(false);
-  const [lookupResults, setLookupResults] = useState<ClientAppointment[] | null>(
-    null
-  );
+  const [lookupResults, setLookupResults] = useState<
+    ClientAppointment[] | null
+  >(null);
   const [lookupError, setLookupError] = useState<string>("");
   const [cancelingId, setCancelingId] = useState<number | null>(null);
+  const [confirmCancelClientAppt, setConfirmCancelClientAppt] =
+    useState<ClientAppointment | null>(null);
 
   // Load initial studio & services data
   useEffect(() => {
     const today = getTodayBrazil();
     setTodayMinDate(today);
-    setSelectedDate(today);
     async function init() {
       try {
         setInitialLoading(true);
@@ -131,7 +257,12 @@ function AgendarContent() {
           ) {
             setSelectedServiceId(querySrvId);
           } else {
-            setSelectedServiceId(String(data.services[0].id));
+            const classic = data.services.find((s: ServiceItem) =>
+              s.name.toLowerCase().includes("clássico")
+            );
+            setSelectedServiceId(
+              String(classic ? classic.id : data.services[0].id)
+            );
           }
         }
         if (searchParams.get("consultar") === "1") {
@@ -151,14 +282,29 @@ function AgendarContent() {
     if (!dateStr) return;
     try {
       setLoadingSlots(true);
-      setSelectedTime("");
       const res = await fetch(`/api/slots?date=${dateStr}`, {
         cache: "no-store",
       });
       const data = await res.json();
       setIsFullDayBlocked(Boolean(data.isFullDayBlocked));
       setBlockReason(data.blockReason || "");
-      setSlots(data.slots || []);
+      const loadedSlots: SlotItem[] = data.slots || [];
+      setSlots(loadedSlots);
+
+      setSelectedTime((prev) => {
+        if (
+          prev &&
+          loadedSlots.some((s) => s.time === prev && s.available)
+        ) {
+          return prev;
+        }
+        const eleven = loadedSlots.find(
+          (s) => s.time === "11:00" && s.available
+        );
+        if (eleven) return eleven.time;
+        const firstAvail = loadedSlots.find((s) => s.available);
+        return firstAvail ? firstAvail.time : "";
+      });
     } catch (err) {
       console.error("Erro ao buscar horários:", err);
     } finally {
@@ -182,7 +328,16 @@ function AgendarContent() {
       currency: "BRL",
     }).format(val || 0);
 
-  const handleConfirmBooking = async (e: React.FormEvent) => {
+  const formatBRLShort = (val: number) => {
+    const num = Number(val || 0);
+    if (Number.isInteger(num)) {
+      return `R$ ${num}`;
+    }
+    return formatBRL(num);
+  };
+
+  // Validate form and open "Conferir Agendamento" modal (Figma node 1-2)
+  const handleOpenReviewModal = (e: React.FormEvent) => {
     e.preventDefault();
     setBookingError("");
 
@@ -195,14 +350,28 @@ function AgendarContent() {
       return;
     }
     if (!clientName.trim() || clientName.trim().length < 2) {
-      setBookingError("Informe seu nome completo.");
+      setBookingError("Informe seu nome completo para confirmação.");
       return;
     }
     const digits = clientPhone.replace(/\D/g, "");
     if (digits.length < 10 || digits.length > 11) {
-      setBookingError("Informe seu WhatsApp com DDD (ex: 11988887777).");
+      setBookingError("Informe seu WhatsApp com DDD (ex: (11) 98765-4321).");
       return;
     }
+    if (!clientAddress.trim() || clientAddress.trim().length < 5) {
+      setBookingError(
+        "Informe seu endereço completo para o atendimento a domicílio."
+      );
+      return;
+    }
+
+    setShowReviewModal(true);
+  };
+
+  // Final booking submission inside the Review Modal
+  const handleFinalConfirmBooking = async () => {
+    setBookingError("");
+    const digits = clientPhone.replace(/\D/g, "");
 
     try {
       setSubmittingBooking(true);
@@ -215,21 +384,29 @@ function AgendarContent() {
           time: selectedTime,
           clientName: clientName.trim(),
           clientPhone: digits,
+          clientAddress: clientAddress.trim(),
           clientNotes: clientNotes.trim(),
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setBookingError(data.error || "Não foi possível confirmar o agendamento.");
+        setShowReviewModal(false);
+        setBookingError(
+          data.error || "Não foi possível confirmar o agendamento."
+        );
         fetchSlotsForDate(selectedDate);
         return;
       }
 
+      setShowReviewModal(false);
       setBookingSuccess(data.appointment);
       fetchSlotsForDate(selectedDate);
     } catch (err) {
       console.error("Erro ao confirmar agendamento:", err);
-      setBookingError("Erro de conexão ao confirmar agendamento. Tente novamente.");
+      setShowReviewModal(false);
+      setBookingError(
+        "Erro de conexão ao confirmar agendamento. Tente novamente."
+      );
     } finally {
       setSubmittingBooking(false);
     }
@@ -291,26 +468,58 @@ function AgendarContent() {
   };
 
   const getWhatsAppConfirmationUrl = (appt: ClientAppointment) => {
-    const phone = (config?.whatsapp || "11999999999").replace(/\D/g, "");
+    const rawPhone = (config?.whatsapp || "5577988350460").replace(/\D/g, "");
+    const phone =
+      !rawPhone || rawPhone === "11999999999" || rawPhone === "5511999999999"
+        ? "5577988350460"
+        : rawPhone;
     const fullPhone = phone.startsWith("55") ? phone : `55${phone}`;
     const fmtDate = appt.date.split("-").reverse().join("/");
+    const addrLine = appt.clientAddress
+      ? `\n📍 *Endereço (Domicílio):* ${appt.clientAddress}`
+      : "";
     const msg = encodeURIComponent(
-      `Olá ${config?.professionalName || ""}! ✨\nAcabei de agendar meu horário pelo site:\n\n💆‍♀️ *Procedimento:* ${appt.serviceName} (${formatBRL(appt.price)})\n📅 *Data:* ${fmtDate} às *${appt.time}*\n👩 *Cliente:* ${appt.clientName}`
+      `Olá ${config?.professionalName || ""}! ✨\nAcabei de agendar meu horário pelo site:\n\n💆‍♀️ *Procedimento:* ${appt.serviceName} (${formatBRL(appt.price)})\n📅 *Data:* ${fmtDate} às *${appt.time}*\n👩 *Cliente:* ${appt.clientName}${addrLine}`
     );
-    return `https://wa.me/${fullPhone}?text=${msg}`;
+    return `https://api.whatsapp.com/send?phone=${fullPhone}&text=${msg}`;
   };
 
-  const isLight = config?.themeMode === "light-rose";
+  // Group slots into MANHÃ (< 12:30), TARDE (12:30 - 17:59), NOITE (>= 18:00)
+  const morningSlots = slots.filter((s) => {
+    const [h, m] = s.time.split(":").map(Number);
+    return h * 60 + m <= 12 * 60;
+  });
+  const afternoonSlots = slots.filter((s) => {
+    const [h, m] = s.time.split(":").map(Number);
+    const mins = h * 60 + m;
+    return mins > 12 * 60 && mins < 18 * 60;
+  });
+  const eveningSlots = slots.filter((s) => {
+    const [h, m] = s.time.split(":").map(Number);
+    return h * 60 + m >= 18 * 60;
+  });
+
+  const openDatePicker = () => {
+    const el = dateInputRef.current;
+    if (!el) return;
+    if (typeof el.showPicker === "function") {
+      try {
+        el.showPicker();
+        return;
+      } catch {
+        // fallback to focus/click
+      }
+    }
+    el.focus();
+    el.click();
+  };
 
   if (initialLoading) {
     return (
-      <div className="min-h-screen bg-[#120b10] flex flex-col items-center justify-center p-6 text-center">
-        <Loader2 className="w-10 h-10 text-rose-400 animate-spin mb-3" />
-        <p className="text-sm font-bold uppercase tracking-wider text-rose-200">
-          Carregando Agenda Online...
-        </p>
-        <p className="text-xs text-rose-300/60 mt-1">
-          Sincronizando procedimentos e horários disponíveis
+      <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center p-6 text-center">
+        <Loader2 className="w-8 h-8 text-[#111111] animate-spin mb-3" />
+        <p className="text-xs font-bold uppercase tracking-widest text-[#78716C]">
+          Carregando Novo Agendamento...
         </p>
       </div>
     );
@@ -318,560 +527,849 @@ function AgendarContent() {
 
   return (
     <div
-      className={`min-h-screen pb-16 ${
-        isLight ? "bg-[#fdf8f6] text-stone-900" : "bg-[#120b10] text-rose-50"
-      }`}
+      key={enterKey}
+      className="min-h-screen bg-[#FAF8F5] text-[#111111] pb-12 font-sans"
     >
-      {/* Sticky Header */}
-      <header
-        className={`sticky top-0 z-40 backdrop-blur-md border-b px-4 py-3.5 flex items-center justify-between ${
-          isLight
-            ? "bg-white/90 border-rose-200"
-            : "bg-[#180f15]/90 border-rose-950/60"
-        }`}
-      >
-        <button
-          onClick={() => {
-            setNavigatingBack(true);
-            router.push("/");
-          }}
-          disabled={navigatingBack}
-          className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition ${
-            isLight
-              ? "border-rose-200 text-stone-700 hover:bg-rose-50"
-              : "border-rose-900/50 text-rose-200 hover:bg-rose-950/60"
-          }`}
-        >
-          {navigatingBack ? (
-            <Loader2 className="w-4 h-4 animate-spin text-rose-400" />
-          ) : (
-            <ArrowLeft className="w-4 h-4 text-rose-400" />
-          )}
-          <span>Voltar</span>
-        </button>
-
-        <span className="text-xs font-black uppercase tracking-widest text-rose-400">
-          Agendamento Online
-        </span>
-
-        <button
-          onClick={() => router.push("/catalogo")}
-          className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-xl border transition ${
-            isLight
-              ? "border-rose-200 text-rose-700 hover:bg-rose-50"
-              : "border-rose-900/50 text-rose-300 hover:bg-rose-950/50"
-          }`}
-        >
-          <BookOpen className="w-3.5 h-3.5 text-rose-400" />
-          <span>Catálogo</span>
-        </button>
-      </header>
-
-      <main className="max-w-md mx-auto p-4 space-y-6">
-        {/* STUDIO PROFILE HEADER (Inspired by Reference Site, tailored for 1 Lash Designer) */}
-        <div
-          className={`p-5 rounded-3xl border text-center space-y-3 shadow-xl ${
-            isLight
-              ? "bg-white border-rose-200"
-              : "bg-[#1a1017] border-rose-900/40"
-          }`}
-        >
-          <div className="w-20 h-20 mx-auto rounded-full p-0.5 bg-gradient-to-tr from-rose-400 via-amber-200 to-rose-500 shadow-lg">
-            <img
-              src={
-                config?.logoUrl ||
-                "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"
-              }
-              alt={config?.studioName}
-              className="w-full h-full object-cover rounded-full"
-            />
-          </div>
-          <div>
-            <h1 className="text-lg font-black uppercase tracking-wider text-rose-400">
-              {config?.studioName}
-            </h1>
-            <p className="text-xs font-semibold text-amber-200/90">
-              Lash Designer: {config?.professionalName}
-            </p>
-            <p
-              className={`text-[11px] mt-0.5 ${
-                isLight ? "text-stone-500" : "text-rose-300/60"
-              }`}
-            >
-              {config?.address}
-            </p>
-          </div>
-          {config?.badges && config.badges.length > 0 && (
-            <div className="flex flex-wrap justify-center gap-1.5 pt-1">
-              {config.badges.slice(0, 3).map((b, i) => (
-                <span
-                  key={i}
-                  className={`text-[10px] px-2.5 py-1 rounded-full font-semibold border ${
-                    isLight
-                      ? "bg-rose-50 text-rose-700 border-rose-200"
-                      : "bg-rose-500/10 text-rose-300 border-rose-500/20"
-                  }`}
-                >
-                  {b}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* SUCCESS SCREEN IF BOOKING COMPLETED */}
-        {bookingSuccess ? (
-          <div
-            className={`p-6 rounded-3xl border space-y-5 text-center shadow-2xl animate-in fade-in zoom-in-95 duration-200 ${
-              isLight
-                ? "bg-white border-emerald-300"
-                : "bg-[#1a1017] border-emerald-500/40"
-            }`}
-          >
-            <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-              <CheckCircle2 className="w-9 h-9 text-emerald-400" />
-            </div>
-            <div className="space-y-1">
-              <span className="text-[11px] font-bold uppercase tracking-widest text-emerald-400">
-                Reserva Confirmada!
-              </span>
-              <h2 className="text-xl font-black">
-                Tudo certo, {bookingSuccess.clientName}! ✨
-              </h2>
-              <p
-                className={`text-xs ${
-                  isLight ? "text-stone-600" : "text-rose-200/70"
-                }`}
-              >
-                Seu horário já está reservado na agenda da{" "}
-                {config?.professionalName}.
-              </p>
-            </div>
-
-            <div
-              className={`p-4 rounded-2xl border text-left space-y-2 text-xs ${
-                isLight
-                  ? "bg-rose-50/60 border-rose-200"
-                  : "bg-[#120b10] border-rose-900/40"
-              }`}
-            >
-              <div className="flex justify-between">
-                <span className="text-rose-300/70">Procedimento:</span>
-                <span className="font-bold text-rose-300">
-                  {bookingSuccess.serviceName}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-rose-300/70">Valor:</span>
-                <span className="font-black text-amber-300">
-                  {formatBRL(bookingSuccess.price)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-rose-300/70">Data e Horário:</span>
-                <span className="font-bold">
-                  {bookingSuccess.date.split("-").reverse().join("/")} às{" "}
-                  {bookingSuccess.time}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-rose-300/70">Duração estimada:</span>
-                <span>{bookingSuccess.duration}</span>
-              </div>
-            </div>
-
-            <div className="space-y-2.5 pt-1">
-              <a
-                href={getWhatsAppConfirmationUrl(bookingSuccess)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-3.5 px-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition"
-              >
-                <MessageCircle className="w-4 h-4" />
-                <span>Enviar Comprovante no WhatsApp</span>
-              </a>
-
+      <div className="max-w-[440px] mx-auto min-h-screen bg-[#FAF8F5] relative">
+        {/* TOP STICKY HEADER + STEPPER BAR (Figma Node 1-214) */}
+        <header className="sticky top-0 z-30 bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#EFECE6]/80 animate-card">
+          <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
               <button
-                onClick={() => {
-                  setBookingSuccess(null);
-                  setSelectedTime("");
-                }}
-                className={`w-full py-3 px-4 rounded-2xl border text-xs font-bold transition ${
-                  isLight
-                    ? "border-rose-200 text-stone-700 hover:bg-rose-50"
-                    : "border-rose-900/50 text-rose-200 hover:bg-rose-950/50"
-                }`}
+                type="button"
+                onClick={() => router.push("/")}
+                aria-label="Voltar"
+                className="w-8 h-8 -ml-1.5 rounded-full flex items-center justify-center text-[#111111] hover:bg-black/5 smooth-press cursor-pointer"
               >
-                Fazer Outro Agendamento
+                <ChevronLeft className="w-5 h-5 stroke-[2.2]" />
+              </button>
+
+              <h1 className="text-[17px] font-bold tracking-tight text-[#111111]">
+                Novo Agendamento
+              </h1>
+            </div>
+
+            {/* Right Professional Avatar & Lookup trigger */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Consultar meus horários"
+                onClick={() => setShowLookupModal(true)}
+                className="w-10 h-10 rounded-full overflow-hidden border border-[#E6DFD5] shadow-sm shrink-0 smooth-press cursor-pointer"
+              >
+                <img
+                  src={config?.logoUrl || "/isa.png"}
+                  alt={config?.professionalName || "Profissional"}
+                  className="w-full h-full object-cover"
+                />
               </button>
             </div>
           </div>
-        ) : (
-          <form onSubmit={handleConfirmBooking} className="space-y-6">
-            {/* STEP 1: SELECT SERVICE (Dropdown with Name & Price as requested!) */}
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold uppercase tracking-wide text-rose-400 border-l-4 border-rose-500 pl-2.5">
-                  1. Escolha o Procedimento
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => router.push("/catalogo")}
-                  className="text-[11px] text-rose-300/80 hover:text-rose-300 underline"
-                >
-                  Ver fotos no catálogo
-                </button>
-              </div>
 
-              <div
-                className={`p-4 rounded-2xl border space-y-3 ${
-                  isLight
-                    ? "bg-white border-rose-200"
-                    : "bg-[#1a1017] border-rose-900/40"
+          {/* STEPPER BAR: 1 Serviço --- 2 Data & Hora --- 3 Revisão */}
+          <div className="px-5 pb-3.5 pt-1 flex items-center justify-between gap-2 animate-card">
+            {/* Step 1 */}
+            <button
+              type="button"
+              onClick={() => setShowServicePicker(true)}
+              className="flex items-center gap-1.5 shrink-0 group smooth-press cursor-pointer"
+            >
+              <span className="w-6 h-6 rounded-full bg-[#EADCE0] text-[#574147] text-[11px] font-bold flex items-center justify-center transition-transform group-hover:scale-105">
+                1
+              </span>
+              <span className="text-[12px] font-medium text-[#78716C] group-hover:text-[#111111] transition-colors">
+                Serviço
+              </span>
+            </button>
+
+            {/* Line 1 -> 2 */}
+            <div className="h-[2px] flex-1 bg-[#111111] rounded-full mx-1" />
+
+            {/* Step 2 (Active) */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span
+                className={`w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center transition-all duration-300 ${
+                  showReviewModal
+                    ? "bg-[#EADCE0] text-[#574147]"
+                    : "bg-[#09090B] text-white"
                 }`}
               >
-                <label
-                  htmlFor="select-servico"
-                  className={`text-xs font-medium block ${
-                    isLight ? "text-stone-600" : "text-rose-200/80"
-                  }`}
-                >
-                  Selecione o serviço desejado na lista:
-                </label>
+                2
+              </span>
+              <span
+                className={`text-[12px] font-bold transition-colors ${
+                  showReviewModal ? "text-[#78716C]" : "text-[#111111]"
+                }`}
+              >
+                Data & Hora
+              </span>
+            </div>
 
-                <div className="relative">
-                  <select
-                    id="select-servico"
-                    value={selectedServiceId}
-                    onChange={(e) => setSelectedServiceId(e.target.value)}
-                    className={`w-full p-3.5 rounded-xl border text-sm font-bold focus:outline-none focus:border-rose-400 transition appearance-none cursor-pointer ${
-                      isLight
-                        ? "bg-rose-50/50 border-rose-200 text-stone-900"
-                        : "bg-[#120b10] border-rose-800/60 text-rose-50"
-                    }`}
-                  >
-                    {services.map((srv) => (
-                      <option
-                        key={srv.id}
-                        value={srv.id}
-                        className="bg-[#1a1017] text-rose-50 py-2"
-                      >
-                        {srv.name} — {formatBRL(srv.price)}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-3.5 flex items-center text-rose-400 text-xs font-bold">
-                    ▼
-                  </div>
+            {/* Line 2 -> 3 */}
+            <div
+              className={`h-[1.5px] flex-1 rounded-full mx-1 transition-colors duration-300 ${
+                showReviewModal ? "bg-[#111111]" : "bg-[#E5E0D8]"
+              }`}
+            />
+
+            {/* Step 3 */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span
+                className={`w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center transition-all duration-300 ${
+                  showReviewModal
+                    ? "bg-[#09090B] text-white"
+                    : "bg-[#EAE5DF] text-[#9CA3AF]"
+                }`}
+              >
+                3
+              </span>
+              <span
+                className={`text-[12px] font-medium transition-colors ${
+                  showReviewModal
+                    ? "text-[#111111] font-bold"
+                    : "text-[#9CA3AF]"
+                }`}
+              >
+                Revisão
+              </span>
+            </div>
+          </div>
+        </header>
+
+        <main className="px-5 pt-2 space-y-6">
+          {/* SUCCESS SCREEN IF BOOKING COMPLETED */}
+          {bookingSuccess ? (
+            <div className="p-6 rounded-[24px] bg-white border border-[#E5E0D8] space-y-5 text-center shadow-sm mt-2 animate-modal">
+              <div className="w-16 h-16 mx-auto rounded-full bg-[#10B981]/15 flex items-center justify-center">
+                <CheckCircle2 className="w-8 h-8 text-[#10B981]" />
+              </div>
+              <div className="space-y-1">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-[#10B981]">
+                  Reserva Confirmada
+                </span>
+                <h2 className="text-xl font-extrabold text-[#111111]">
+                  Tudo certo, {bookingSuccess.clientName}!
+                </h2>
+                <p className="text-xs text-[#78716C]">
+                  Seu horário já está reservado na agenda de{" "}
+                  {config?.professionalName}.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#F4F1EC] text-left space-y-2.5 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-[#78716C]">Procedimento:</span>
+                  <span className="font-bold text-[#111111]">
+                    {bookingSuccess.serviceName}
+                  </span>
                 </div>
-
-                {/* Compact preview of the selected service */}
-                {selectedService && (
-                  <div
-                    className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
-                      isLight
-                        ? "bg-rose-50/40 border-rose-200/60"
-                        : "bg-[#120b10]/70 border-rose-900/30"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      {selectedService.imageUrl ? (
-                        <img
-                          src={selectedService.imageUrl}
-                          alt={selectedService.name}
-                          className="w-11 h-11 rounded-lg object-cover shrink-0 border border-rose-400/30"
-                        />
-                      ) : (
-                        <div className="w-11 h-11 rounded-lg bg-rose-500/10 flex items-center justify-center shrink-0">
-                          <Sparkles className="w-5 h-5 text-rose-400" />
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold truncate">
-                          {selectedService.name}
-                        </p>
-                        <p className="text-[11px] text-rose-300/70 flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-rose-400" />
-                          <span>Duração: {selectedService.duration}</span>
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-400/30 text-rose-300 font-black text-xs">
-                        {formatBRL(selectedService.price)}
-                      </span>
-                    </div>
+                <div className="flex justify-between">
+                  <span className="text-[#78716C]">Valor:</span>
+                  <span className="font-extrabold text-[#111111]">
+                    {formatBRL(bookingSuccess.price)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#78716C]">Data e Horário:</span>
+                  <span className="font-bold text-[#111111]">
+                    {bookingSuccess.date.split("-").reverse().join("/")} às{" "}
+                    {bookingSuccess.time}
+                  </span>
+                </div>
+                {bookingSuccess.clientAddress && (
+                  <div className="flex justify-between gap-3">
+                    <span className="text-[#78716C] shrink-0">
+                      Endereço (Domicílio):
+                    </span>
+                    <span className="font-bold text-[#111111] text-right">
+                      {bookingSuccess.clientAddress}
+                    </span>
                   </div>
                 )}
               </div>
-            </section>
 
-            {/* STEP 2: DATE AND TIME */}
-            <section className="space-y-3">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-rose-400 border-l-4 border-rose-500 pl-2.5">
-                2. Data e Horário
-              </h2>
+              <div className="space-y-2.5 pt-1">
+                <a
+                  href={getWhatsAppConfirmationUrl(bookingSuccess)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-4 px-5 rounded-[18px] bg-[#09090B] hover:bg-zinc-800 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md smooth-press"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Enviar Comprovante no WhatsApp</span>
+                </a>
 
-              <div
-                className={`p-4 rounded-2xl border space-y-4 ${
-                  isLight
-                    ? "bg-white border-rose-200"
-                    : "bg-[#1a1017] border-rose-900/40"
-                }`}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBookingSuccess(null);
+                  }}
+                  className="w-full py-3.5 px-4 rounded-[18px] bg-[#F3EFEA] text-[#111111] text-xs font-bold hover:bg-[#EAE4DC] smooth-press cursor-pointer"
+                >
+                  Fazer Outro Agendamento
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleOpenReviewModal} className="space-y-6">
+              {/* CHOSEN PROCEDURE CARD (Blush Pink #EADCE0) */}
+              <section
+                className="space-y-2.5 animate-card"
+                style={{ animationDelay: "30ms" }}
               >
-                <div>
-                  <label
-                    htmlFor="booking-date"
-                    className={`text-xs font-medium block mb-1.5 ${
-                      isLight ? "text-stone-600" : "text-rose-200/80"
-                    }`}
-                  >
-                    Selecione o Dia
-                  </label>
-                  <input
-                    id="booking-date"
-                    type="date"
-                    min={todayMinDate}
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className={`w-full p-3.5 rounded-xl border text-sm font-semibold focus:outline-none focus:border-rose-400 transition ${
-                      isLight
-                        ? "bg-rose-50/40 border-rose-200 text-stone-900"
-                        : "bg-[#120b10] border-rose-800/60 text-rose-50"
-                    }`}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div
-                    className={`p-2.5 rounded-xl border flex items-center justify-between ${
-                      isLight
-                        ? "bg-rose-50/60 border-rose-200"
-                        : "bg-[#120b10] border-rose-900/40"
-                    }`}
-                  >
-                    <span className="text-xs font-semibold text-rose-200">
-                      Horários disponíveis para agendamento
-                    </span>
-                    {loadingSlots && (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-rose-400 font-bold">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Atualizando...</span>
+                <div
+                  onClick={() => setShowServicePicker(true)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ")
+                      setShowServicePicker(true);
+                  }}
+                  className="p-4 rounded-[22px] bg-[#EADCE0] flex items-center justify-between gap-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] cursor-pointer smooth-card"
+                >
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className="w-14 h-14 rounded-2xl overflow-hidden bg-[#D8C5CA] shrink-0 shadow-sm">
+                      <img
+                        src={
+                          selectedService?.imageUrl ||
+                          "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=400&auto=format&fit=crop&q=80"
+                        }
+                        alt={selectedService?.name || "Procedimento"}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[#7D6B70]">
+                        PROCEDIMENTO ESCOLHIDO
                       </span>
-                    )}
+                      <h2 className="text-[16px] font-extrabold text-[#111111] truncate leading-snug mt-0.5">
+                        {selectedService?.name || "Clássico Fio a Fio"}
+                      </h2>
+                      <p className="text-[13px] font-semibold text-[#3F3A3C]">
+                        {formatBRL(selectedService?.price ?? 190)}
+                      </p>
+                    </div>
                   </div>
 
-                  {loadingSlots ? (
-                    <div className="py-8 flex flex-col items-center justify-center gap-2">
-                      <Loader2 className="w-7 h-7 text-rose-400 animate-spin" />
-                      <span className="text-xs text-rose-300/70">
-                        Consultando disponibilidade da agenda...
-                      </span>
-                    </div>
-                  ) : isFullDayBlocked ? (
-                    <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-center space-y-1">
-                      <p className="text-xs font-bold text-red-300">
-                        🚫 {blockReason || "Agenda fechada nesta data"}
-                      </p>
-                      <p className="text-[11px] text-red-200/70">
-                        Por favor, escolha outra data no calendário acima.
-                      </p>
-                    </div>
-                  ) : slots.length === 0 ? (
-                    <p className="text-xs text-rose-300/60 text-center py-4">
-                      Nenhum horário cadastrado para este dia.
-                    </p>
-                  ) : (
-                    <div className="grid grid-cols-3 gap-2 pt-1">
-                      {slots.map((slot) => {
-                        const isSelected = selectedTime === slot.time;
-                        return (
-                          <button
-                            key={slot.time}
-                            type="button"
-                            disabled={!slot.available}
-                            onClick={() => setSelectedTime(slot.time)}
-                            className={`py-3 px-2 rounded-xl border text-xs font-bold transition flex flex-col items-center justify-center ${
-                              !slot.available
-                                ? "opacity-40 cursor-not-allowed bg-stone-900/40 border-stone-800 text-stone-500 line-through"
-                                : isSelected
-                                ? "bg-gradient-to-r from-rose-400 to-amber-300 text-zinc-950 border-rose-300 shadow-lg shadow-rose-500/20 scale-[1.02]"
-                                : isLight
-                                ? "bg-white hover:bg-rose-50 border-rose-200 text-stone-800"
-                                : "bg-[#120b10] hover:border-rose-400/60 border-rose-900/50 text-rose-100"
-                            }`}
-                          >
-                            <span>{slot.time}</span>
-                            {!slot.available && slot.reason && (
-                              <span className="text-[9px] font-normal no-underline mt-0.5">
-                                {slot.reason}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowServicePicker(true);
+                    }}
+                    aria-label="Trocar procedimento"
+                    className="w-10 h-10 rounded-full bg-white text-[#111111] flex items-center justify-center shrink-0 shadow-sm smooth-press cursor-pointer"
+                  >
+                    <Pencil className="w-4 h-4 stroke-[2.2]" />
+                  </button>
+                </div>
+              </section>
+
+              {/* SELECIONE O DIA SECTION */}
+              <section
+                className="space-y-3 animate-card"
+                style={{ animationDelay: "70ms" }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-[18px] h-[18px] text-[#111111] stroke-[2.2]" />
+                    <h2 className="text-[16px] font-extrabold text-[#111111] tracking-tight">
+                      Selecione o dia
+                    </h2>
+                  </div>
+                  {selectedDate && (
+                    <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#78716C]">
+                      {formatMonthYearUpper(selectedDate)}
+                    </span>
                   )}
                 </div>
-              </div>
-            </section>
 
-            {/* STEP 3: CLIENT LOOKUP BANNER (Just like reference site) */}
-            <section
-              className={`p-4 rounded-2xl border space-y-2.5 ${
-                isLight
-                  ? "bg-rose-50/70 border-rose-200"
-                  : "bg-[#1a1017] border-rose-800/50"
-              }`}
-            >
-              <div>
-                <h2 className="text-sm font-bold text-rose-300 flex items-center gap-1.5">
-                  <span>📋 Já tem um horário marcado?</span>
-                </h2>
-                <p
-                  className={`text-xs mt-0.5 ${
-                    isLight ? "text-stone-600" : "text-rose-200/70"
-                  }`}
+                {/* Custom DatePicker Component (react-day-picker) */}
+                <DatePicker
+                  variant="banner"
+                  title="Selecione o dia"
+                  value={selectedDate}
+                  minDate={todayMinDate}
+                  label={
+                    selectedDate
+                      ? formatLongDateChip(selectedDate)
+                      : "Escolher a data"
+                  }
+                  onChange={(d) => setSelectedDate(d)}
+                />
+              </section>
+
+              {/* HORÁRIOS DISPONÍVEIS SECTION */}
+              <section
+                className="space-y-3 animate-card"
+                style={{ animationDelay: "110ms" }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-[18px] h-[18px] text-[#111111] stroke-[2.2]" />
+                    <h2 className="text-[16px] font-extrabold text-[#111111] tracking-tight">
+                      Horários disponíveis
+                    </h2>
+                  </div>
+                  <span className="text-[12px] font-medium text-[#78716C]">
+                    {selectedDate
+                      ? formatShortSubtitleDate(selectedDate)
+                      : "Escolha uma data"}
+                  </span>
+                </div>
+
+                {!selectedDate ? (
+                  <div className="p-6 rounded-[22px] bg-white text-center space-y-1 shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
+                    <p className="text-xs font-bold text-[#111111]">
+                      Nenhuma data selecionada
+                    </p>
+                    <p className="text-[11px] text-[#78716C]">
+                      Clique em <b>Escolher a data</b> acima para ver os horários disponíveis.
+                    </p>
+                  </div>
+                ) : loadingSlots ? (
+                  <div className="p-8 rounded-[22px] bg-white flex flex-col items-center justify-center gap-2 shadow-xs animate-expand">
+                    <Loader2 className="w-6 h-6 text-[#111111] animate-spin" />
+                    <span className="text-xs text-[#78716C] font-medium">
+                      Consultando disponibilidade...
+                    </span>
+                  </div>
+                ) : isFullDayBlocked ? (
+                  <div className="p-5 rounded-[22px] bg-white border border-red-200 text-center space-y-1 animate-expand">
+                    <p className="text-xs font-bold text-red-600">
+                      {blockReason || "Agenda fechada nesta data"}
+                    </p>
+                    <p className="text-[11px] text-[#78716C]">
+                      Toque na data acima para escolher outro dia.
+                    </p>
+                  </div>
+                ) : slots.length === 0 ? (
+                  <div className="p-5 rounded-[22px] bg-white text-center animate-expand">
+                    <p className="text-xs text-[#78716C]">
+                      Nenhum horário cadastrado para este dia.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* MANHÃ */}
+                    {morningSlots.length > 0 && (
+                      <div className="p-4 rounded-[22px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.02)] space-y-3 smooth-card">
+                        <div className="flex items-center gap-1.5 text-[#78716C]">
+                          <Sunrise className="w-4 h-4 stroke-[2]" />
+                          <span className="text-[11px] font-bold uppercase tracking-[0.08em]">
+                            MANHÃ
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2.5">
+                          {morningSlots.map((slot) => {
+                            const isSelected = selectedTime === slot.time;
+                            return (
+                              <button
+                                key={slot.time}
+                                type="button"
+                                disabled={!slot.available}
+                                onClick={() => setSelectedTime(slot.time)}
+                                className={`py-3 px-2 rounded-[14px] text-[13px] font-bold smooth-press flex items-center justify-center ${
+                                  !slot.available
+                                    ? "bg-[#F7F5F2] text-[#C8C3BC] line-through cursor-not-allowed"
+                                    : isSelected
+                                    ? "bg-[#09090B] text-white shadow-sm scale-[1.02]"
+                                    : "bg-[#F3EFEA] hover:bg-[#E9E4DD] text-[#111111] cursor-pointer"
+                                }`}
+                              >
+                                {slot.time}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TARDE */}
+                    {afternoonSlots.length > 0 && (
+                      <div className="p-4 rounded-[22px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.02)] space-y-3 smooth-card">
+                        <div className="flex items-center gap-1.5 text-[#78716C]">
+                          <Sun className="w-4 h-4 stroke-[2]" />
+                          <span className="text-[11px] font-bold uppercase tracking-[0.08em]">
+                            TARDE
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2.5">
+                          {afternoonSlots.map((slot) => {
+                            const isSelected = selectedTime === slot.time;
+                            return (
+                              <button
+                                key={slot.time}
+                                type="button"
+                                disabled={!slot.available}
+                                onClick={() => setSelectedTime(slot.time)}
+                                className={`py-3 px-2 rounded-[14px] text-[13px] font-bold smooth-press flex items-center justify-center ${
+                                  !slot.available
+                                    ? "bg-[#F7F5F2] text-[#C8C3BC] line-through cursor-not-allowed"
+                                    : isSelected
+                                    ? "bg-[#09090B] text-white shadow-sm scale-[1.02]"
+                                    : "bg-[#F3EFEA] hover:bg-[#E9E4DD] text-[#111111] cursor-pointer"
+                                }`}
+                              >
+                                {slot.time}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* NOITE */}
+                    {eveningSlots.length > 0 && (
+                      <div className="p-4 rounded-[22px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.02)] space-y-3 smooth-card">
+                        <div className="flex items-center gap-1.5 text-[#78716C]">
+                          <Moon className="w-4 h-4 stroke-[2]" />
+                          <span className="text-[11px] font-bold uppercase tracking-[0.08em]">
+                            NOITE
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2.5">
+                          {eveningSlots.map((slot) => {
+                            const isSelected = selectedTime === slot.time;
+                            return (
+                              <button
+                                key={slot.time}
+                                type="button"
+                                disabled={!slot.available}
+                                onClick={() => setSelectedTime(slot.time)}
+                                className={`py-3 px-2 rounded-[14px] text-[13px] font-bold smooth-press flex items-center justify-center ${
+                                  !slot.available
+                                    ? "bg-[#F7F5F2] text-[#C8C3BC] line-through cursor-not-allowed"
+                                    : isSelected
+                                    ? "bg-[#09090B] text-white shadow-sm scale-[1.02]"
+                                    : "bg-[#F3EFEA] hover:bg-[#E9E4DD] text-[#111111] cursor-pointer"
+                                }`}
+                              >
+                                {slot.time}
+                              </button>
+                            );
+                          })}
+                          {eveningSlots.length === 2 && (
+                            <div className="py-3 px-2 rounded-[14px] bg-[#F7F5F2] text-[#C8C3BC] text-[12px] font-semibold flex items-center justify-center select-none">
+                              Esgotado
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+
+              {/* SEUS DADOS PARA CONFIRMAÇÃO SECTION */}
+              <section
+                className="space-y-3 animate-card"
+                style={{ animationDelay: "150ms" }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <User className="w-[18px] h-[18px] text-[#111111] stroke-[2.2]" />
+                    <h2 className="text-[16px] font-extrabold text-[#111111] tracking-tight">
+                      Seus dados para confirmação
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowLookupModal(true)}
+                    className="text-[11px] font-bold text-[#78716C] hover:text-[#111111] underline cursor-pointer"
+                  >
+                    Meus horários
+                  </button>
+                </div>
+
+                <div className="space-y-2.5">
+                  {/* NOME COMPLETO */}
+                  <div className="px-4 py-3.5 rounded-[20px] bg-white shadow-[0_2px_10px_rgba(0,0,0,0.02)] smooth-card">
+                    <label
+                      htmlFor="input-client-name"
+                      className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[#78716C] mb-1.5"
+                    >
+                      NOME COMPLETO
+                    </label>
+                    <div className="flex items-center gap-2.5">
+                      <IdCard className="w-4 h-4 text-[#9CA3AF] shrink-0" />
+                      <input
+                        id="input-client-name"
+                        type="text"
+                        required
+                        value={clientName}
+                        onChange={(e) => setClientName(e.target.value)}
+                        placeholder="Mariana Silveira"
+                        className="w-full bg-transparent text-[14px] font-medium text-[#111111] placeholder:text-[#C0B9B0] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* WHATSAPP PARA LEMBRETE */}
+                  <div className="px-4 py-3.5 rounded-[20px] bg-white shadow-[0_2px_10px_rgba(0,0,0,0.02)] smooth-card">
+                    <label
+                      htmlFor="input-client-phone"
+                      className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[#78716C] mb-1.5"
+                    >
+                      WHATSAPP PARA LEMBRETE
+                    </label>
+                    <div className="flex items-center gap-2.5">
+                      <MessageSquare className="w-4 h-4 text-[#9CA3AF] shrink-0" />
+                      <input
+                        id="input-client-phone"
+                        type="tel"
+                        inputMode="numeric"
+                        required
+                        value={clientPhone}
+                        onChange={(e) =>
+                          setClientPhone(formatPhoneMask(e.target.value))
+                        }
+                        placeholder="(11) 98765-4321"
+                        className="w-full bg-transparent text-[14px] font-medium text-[#111111] placeholder:text-[#C0B9B0] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* ENDEREÇO PARA ATENDIMENTO A DOMICÍLIO */}
+                  <div className="px-4 py-3.5 rounded-[20px] bg-white shadow-[0_2px_10px_rgba(0,0,0,0.02)] smooth-card">
+                    <label
+                      htmlFor="input-client-address"
+                      className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[#78716C] mb-1.5"
+                    >
+                      ENDEREÇO (ATENDIMENTO A DOMICÍLIO)
+                    </label>
+                    <div className="flex items-center gap-2.5">
+                      <MapPin className="w-4 h-4 text-[#9CA3AF] shrink-0" />
+                      <input
+                        id="input-client-address"
+                        type="text"
+                        required
+                        value={clientAddress}
+                        onChange={(e) => setClientAddress(e.target.value)}
+                        placeholder="Rua, número, complemento e bairro"
+                        className="w-full bg-transparent text-[14px] font-medium text-[#111111] placeholder:text-[#C0B9B0] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* OBSERVAÇÕES OU ALERGIAS (OPCIONAL) */}
+                  <div className="px-4 py-3.5 rounded-[20px] bg-white shadow-[0_2px_10px_rgba(0,0,0,0.02)] smooth-card">
+                    <label
+                      htmlFor="input-client-notes"
+                      className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[#78716C] mb-1.5"
+                    >
+                      OBSERVAÇÕES OU ALERGIAS (OPCIONAL)
+                    </label>
+                    <div className="flex items-start gap-2.5">
+                      <PenLine className="w-4 h-4 text-[#9CA3AF] shrink-0 mt-0.5" />
+                      <textarea
+                        id="input-client-notes"
+                        rows={2}
+                        value={clientNotes}
+                        onChange={(e) => setClientNotes(e.target.value)}
+                        placeholder="Ex: Primeira vez fazendo extensão, sensibilidade leve a colas..."
+                        className="w-full bg-transparent text-[13px] font-medium text-[#111111] placeholder:text-[#C0B9B0] focus:outline-none resize-none leading-relaxed"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {bookingError && (
+                <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 flex items-center gap-2.5 text-xs text-red-700 font-semibold animate-expand">
+                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                  <span>{bookingError}</span>
+                </div>
+              )}
+
+              {/* BOTTOM CTA BAR (Figma Node 1-214) */}
+              <div
+                className="pt-1 pb-4 animate-card"
+                style={{ animationDelay: "190ms" }}
+              >
+                <button
+                  type="submit"
+                  disabled={submittingBooking || loadingSlots}
+                  className="w-full py-4 px-5 rounded-[20px] bg-[#09090B] hover:bg-zinc-800 text-white flex items-center justify-between shadow-[0_10px_24px_rgba(0,0,0,0.14)] smooth-press disabled:opacity-60 cursor-pointer"
                 >
-                  Consulte ou desmarque seus próximos agendamentos usando o
-                  WhatsApp informado quando marcou.
+                  <span className="flex items-center gap-2.5 text-[14px] font-bold">
+                    <CalendarCheck className="w-5 h-5 text-white stroke-[2]" />
+                    <span>Confirmar Agendamento</span>
+                  </span>
+
+                  <span className="flex items-center gap-1.5 text-[16px] font-extrabold">
+                    <span>
+                      {formatBRLShort(selectedService?.price ?? 190)}
+                    </span>
+                    <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                  </span>
+                </button>
+              </div>
+            </form>
+          )}
+        </main>
+      </div>
+
+      {/* ==================== MODAL: TROCAR PROCEDIMENTO ==================== */}
+      <AnimatedModal
+        open={showServicePicker}
+        onClose={() => setShowServicePicker(false)}
+        roundedClass="rounded-[32px]"
+        cardClassName={
+          services.length >= 8 ? "h-[90vh] max-h-[90vh] flex flex-col" : ""
+        }
+      >
+            <div className="flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-[17px] font-extrabold text-[#111111]">
+                  Escolher Procedimento
+                </h3>
+                <p className="text-xs text-[#78716C]">
+                  Selecione o procedimento desejado
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setShowLookupModal(true)}
-                className="w-full bg-rose-500/15 hover:bg-rose-500/25 border border-rose-400/40 text-rose-200 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition"
+                aria-label="Fechar"
+                onClick={() => setShowServicePicker(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[#78716C] hover:bg-black/5 smooth-press cursor-pointer"
               >
-                Consultar Meus Horários
+                <X className="w-4 h-4" />
               </button>
-            </section>
+            </div>
 
-            {/* STEP 4: CLIENT DETAILS */}
-            <section className="space-y-3">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-rose-400 border-l-4 border-rose-500 pl-2.5">
-                3. Seus Dados
-              </h2>
-
-              <div
-                className={`p-4 rounded-2xl border space-y-3.5 ${
-                  isLight
-                    ? "bg-white border-rose-200"
-                    : "bg-[#1a1017] border-rose-900/40"
-                }`}
-              >
-                <div>
-                  <label className="text-xs text-rose-200/80 block mb-1 font-medium">
-                    Seu Nome Completo *
-                  </label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-rose-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      value={clientName}
-                      onChange={(e) => setClientName(e.target.value)}
-                      placeholder="Ex: Mariana Costa"
-                      className={`w-full pl-10 pr-3.5 py-3 rounded-xl border text-sm focus:outline-none focus:border-rose-400 ${
-                        isLight
-                          ? "bg-rose-50/30 border-rose-200 text-stone-900"
-                          : "bg-[#120b10] border-rose-800/60 text-rose-50"
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs text-rose-200/80 block mb-1 font-medium">
-                    Seu WhatsApp com DDD *
-                  </label>
-                  <div className="relative">
-                    <Phone className="w-4 h-4 text-rose-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      required
-                      value={clientPhone}
-                      onChange={(e) => setClientPhone(e.target.value)}
-                      placeholder="Ex: 11988887777"
-                      className={`w-full pl-10 pr-3.5 py-3 rounded-xl border text-sm focus:outline-none focus:border-rose-400 ${
-                        isLight
-                          ? "bg-rose-50/30 border-rose-200 text-stone-900"
-                          : "bg-[#120b10] border-rose-800/60 text-rose-50"
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs text-rose-200/80 block mb-1 font-medium">
-                    Observação (Opcional)
-                  </label>
-                  <input
-                    type="text"
-                    value={clientNotes}
-                    onChange={(e) => setClientNotes(e.target.value)}
-                    placeholder="Ex: Tenho cílios de outro profissional para remover"
-                    className={`w-full p-3 rounded-xl border text-xs focus:outline-none focus:border-rose-400 ${
-                      isLight
-                        ? "bg-rose-50/30 border-rose-200 text-stone-900"
-                        : "bg-[#120b10] border-rose-800/60 text-rose-50"
-                    }`}
-                  />
-                </div>
-              </div>
-            </section>
-
-            {bookingError && (
-              <div className="p-3.5 rounded-2xl bg-red-500/15 border border-red-500/40 flex items-center gap-2.5 text-xs text-red-200 font-medium">
-                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                <span>{bookingError}</span>
-              </div>
-            )}
-
-            {/* SUBMIT BUTTON WITH LOADING STATE */}
-            <button
-              type="submit"
-              disabled={submittingBooking || loadingSlots}
-              className="w-full bg-gradient-to-r from-rose-400 via-rose-300 to-amber-200 text-zinc-950 font-black p-4 rounded-2xl hover:brightness-105 transition shadow-xl shadow-rose-500/20 active:scale-98 text-sm uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60"
+            <div
+              className={
+                services.length >= 8
+                  ? "space-y-2 flex-1 min-h-0 overflow-y-auto pr-1"
+                  : "space-y-2 max-h-72 overflow-y-auto pr-1"
+              }
             >
-              {submittingBooking ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin text-zinc-950" />
-                  <span>Confirmando seu Agendamento...</span>
-                </>
-              ) : (
-                <>
-                  <Calendar className="w-5 h-5" />
-                  <span>Confirmar Agendamento</span>
-                </>
-              )}
-            </button>
-          </form>
-        )}
-      </main>
+              {services.map((srv) => {
+                const isCurrent =
+                  String(srv.id) === String(selectedServiceId);
+                return (
+                  <button
+                    key={srv.id}
+                    type="button"
+                    onClick={() => {
+                      const nextId = String(srv.id);
+                      setShowServicePicker(false);
+                      requestAnimationFrame(() => {
+                        setSelectedServiceId(nextId);
+                      });
+                    }}
+                    className={`w-full p-3 rounded-2xl flex items-center justify-between text-left smooth-press cursor-pointer ${
+                      isCurrent
+                        ? "bg-[#09090B] text-white shadow-sm"
+                        : "bg-[#FAF8F5] hover:bg-[#F3EFEA] text-[#111111]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      {srv.imageUrl ? (
+                        <img
+                          src={srv.imageUrl}
+                          alt={srv.name}
+                          className="w-11 h-11 rounded-xl object-cover shrink-0"
+                        />
+                      ) : (
+                        <div className="w-11 h-11 rounded-xl bg-[#EADCE0] flex items-center justify-center shrink-0">
+                          <Sparkles className="w-4 h-4 text-[#111111]" />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs font-extrabold truncate">
+                          {srv.name}
+                        </p>
+                        <p
+                          className={`text-[11px] ${
+                            isCurrent ? "text-zinc-300" : "text-[#78716C]"
+                          }`}
+                        >
+                          {srv.category}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-extrabold shrink-0 ml-2">
+                      {formatBRL(srv.price)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
 
-      {/* MODAL: CONSULTAR / DESMARCAR HORÁRIOS */}
-      {showLookupModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#1a1017] border border-rose-800/60 rounded-3xl p-5 space-y-4 shadow-2xl">
+            <button
+              type="button"
+              onClick={() => {
+                setShowServicePicker(false);
+                router.push("/catalogo");
+              }}
+              className="w-full py-3 rounded-2xl bg-[#F3EFEA] hover:bg-[#E7E2DA] text-[#111111] text-xs font-bold smooth-press cursor-pointer shrink-0"
+            >
+              Ver fotos e detalhes no catálogo completo
+            </button>
+      </AnimatedModal>
+
+      {/* ==================== MODAL: CONFERIR AGENDAMENTO (Figma Node 1-2) ==================== */}
+      <AnimatedModal
+        open={Boolean(showReviewModal && selectedService)}
+        onClose={() => setShowReviewModal(false)}
+        roundedClass="rounded-[32px]"
+      >
+        {selectedService && (
+          <>
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-full bg-[#EADCE0] flex items-center justify-center shrink-0">
+                  <ListChecks className="w-5 h-5 text-[#111111] stroke-[2]" />
+                </div>
+                <div>
+                  <h3 className="text-[17px] font-extrabold text-[#111111] leading-snug">
+                    Conferir Agendamento
+                  </h3>
+                  <p className="text-[12px] text-[#78716C] leading-snug mt-0.5">
+                    Revise os dados antes de
+                    <br />
+                    finalizar
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowReviewModal(false)}
+                aria-label="Fechar"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[#78716C] hover:bg-black/5 smooth-press cursor-pointer"
+              >
+                <X className="w-4 h-4 stroke-[2.2]" />
+              </button>
+            </div>
+
+            {/* Summary Cream Box (#F4F1EC) */}
+            <div className="p-5 rounded-[22px] bg-[#F4F1EC] border border-[#E8E2D9] space-y-4">
+              {/* Top Row: Procedimento & Price */}
+              <div className="flex items-start justify-between gap-3 pb-3.5 border-b border-[#E5DFD5]">
+                <div>
+                  <span className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[#78716C]">
+                    PROCEDIMENTO
+                  </span>
+                  <h4 className="text-[16px] font-extrabold text-[#111111] mt-0.5">
+                    {selectedService.name}
+                  </h4>
+                </div>
+                <span className="text-[17px] font-extrabold text-[#111111] shrink-0">
+                  {formatBRL(selectedService.price)}
+                </span>
+              </div>
+
+              {/* Details Rows */}
+              <div className="space-y-3.5">
+                {/* DATA & HORÁRIO */}
+                <div className="flex items-center gap-3">
+                  <Calendar className="w-4 h-4 text-[#111111] shrink-0 stroke-[2]" />
+                  <div>
+                    <span className="block text-[9px] font-bold uppercase tracking-[0.08em] text-[#78716C]">
+                      DATA & HORÁRIO
+                    </span>
+                    <p className="text-[13px] font-semibold text-[#111111]">
+                      {formatModalDateAndTime(selectedDate, selectedTime)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* CLIENTE */}
+                <div className="flex items-center gap-3">
+                  <User className="w-4 h-4 text-[#111111] shrink-0 stroke-[2]" />
+                  <div>
+                    <span className="block text-[9px] font-bold uppercase tracking-[0.08em] text-[#78716C]">
+                      CLIENTE
+                    </span>
+                    <p className="text-[13px] font-semibold text-[#111111]">
+                      {clientName.trim()} • {formatPhoneMask(clientPhone)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* ENDEREÇO (ATENDIMENTO A DOMICÍLIO) */}
+                <div className="flex items-start gap-3">
+                  <MapPin className="w-4 h-4 text-[#111111] shrink-0 stroke-[2] mt-0.5" />
+                  <div>
+                    <span className="block text-[9px] font-bold uppercase tracking-[0.08em] text-[#78716C]">
+                      ENDEREÇO (A DOMICÍLIO)
+                    </span>
+                    <p className="text-[13px] font-semibold text-[#111111] leading-snug">
+                      {clientAddress.trim()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-3 pt-1">
+              <button
+                type="button"
+                disabled={submittingBooking}
+                onClick={handleFinalConfirmBooking}
+                className="w-full py-4 px-5 rounded-[18px] bg-[#09090B] hover:bg-zinc-800 text-white font-bold text-[14px] flex items-center justify-center gap-2 shadow-md smooth-press disabled:opacity-60 cursor-pointer"
+              >
+                {submittingBooking ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Confirmando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 stroke-[2.5]" />
+                    <span>Confirmar e Agendar</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                disabled={submittingBooking}
+                onClick={() => setShowReviewModal(false)}
+                className="w-full py-2 text-center text-[13px] font-semibold text-[#57534E] hover:text-[#111111] smooth-press cursor-pointer"
+              >
+                Voltar e editar dados
+              </button>
+            </div>
+          </>
+        )}
+      </AnimatedModal>
+
+      {/* ==================== MODAL: CONSULTAR / DESMARCAR HORÁRIOS ==================== */}
+      <AnimatedModal
+        open={showLookupModal}
+        onClose={() => {
+          setShowLookupModal(false);
+          setLookupResults(null);
+          setLookupError("");
+        }}
+        roundedClass="rounded-[32px]"
+      >
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-black uppercase tracking-wider text-rose-300">
-                📋 Consultar Meus Agendamentos
+              <h3 className="text-base font-extrabold text-[#111111]">
+                Consultar Meus Agendamentos
               </h3>
               <button
+                type="button"
+                aria-label="Fechar"
                 onClick={() => {
                   setShowLookupModal(false);
                   setLookupResults(null);
                   setLookupError("");
                 }}
-                className="text-xs text-rose-300/70 hover:text-rose-200 font-bold px-2 py-1"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[#78716C] hover:bg-black/5 smooth-press cursor-pointer"
               >
-                Fechar ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleLookupAppointments} className="space-y-3">
-              <p className="text-xs text-rose-200/70">
+              <p className="text-xs text-[#78716C]">
                 Informe o número de WhatsApp com DDD usado no seu agendamento:
               </p>
               <div className="flex gap-2">
@@ -879,14 +1377,16 @@ function AgendarContent() {
                   type="tel"
                   inputMode="numeric"
                   value={lookupPhone}
-                  onChange={(e) => setLookupPhone(e.target.value)}
-                  placeholder="Ex: 11988887777"
-                  className="flex-1 bg-[#120b10] border border-rose-800/60 rounded-xl p-3 text-sm text-rose-50 focus:outline-none focus:border-rose-400"
+                  onChange={(e) =>
+                    setLookupPhone(formatPhoneMask(e.target.value))
+                  }
+                  placeholder="(11) 98765-4321"
+                  className="flex-1 bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl px-3.5 py-3 text-sm text-[#111111] focus:outline-none focus:border-[#111111]"
                 />
                 <button
                   type="submit"
                   disabled={loadingLookup}
-                  className="px-4 py-3 rounded-xl bg-rose-500 text-zinc-950 font-black text-xs uppercase flex items-center gap-1.5"
+                  className="px-4 py-3 rounded-xl bg-[#09090B] text-white font-bold text-xs flex items-center gap-1.5 smooth-press cursor-pointer"
                 >
                   {loadingLookup ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -899,7 +1399,7 @@ function AgendarContent() {
             </form>
 
             {lookupError && (
-              <p className="text-xs text-red-300 bg-red-500/10 border border-red-500/30 p-2.5 rounded-xl">
+              <p className="text-xs text-red-600 bg-red-50 border border-red-200 p-2.5 rounded-xl animate-expand">
                 {lookupError}
               </p>
             )}
@@ -907,26 +1407,27 @@ function AgendarContent() {
             {lookupResults !== null && (
               <div className="space-y-2.5 max-h-72 overflow-y-auto pt-1">
                 {lookupResults.length === 0 ? (
-                  <p className="text-xs text-rose-300/60 text-center py-4">
+                  <p className="text-xs text-[#78716C] text-center py-4">
                     Nenhum agendamento ativo encontrado para este WhatsApp.
                   </p>
                 ) : (
-                  lookupResults.map((item) => (
+                  lookupResults.map((item, idx) => (
                     <div
                       key={item.id}
-                      className="p-3.5 rounded-2xl bg-[#120b10] border border-rose-900/50 space-y-2"
+                      style={{ animationDelay: `${idx * 40}ms` }}
+                      className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#E5E0D8] space-y-2.5 animate-card"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="text-xs font-bold text-rose-200">
+                          <p className="text-sm font-bold text-[#111111]">
                             {item.serviceName}
                           </p>
-                          <p className="text-[11px] text-rose-300/70">
-                            📅 {item.date.split("-").reverse().join("/")} às{" "}
-                            <b className="text-amber-300">{item.time}</b>
+                          <p className="text-xs text-[#78716C]">
+                            {item.date.split("-").reverse().join("/")} às{" "}
+                            <b className="text-[#111111]">{item.time}</b>
                           </p>
                         </div>
-                        <span className="text-xs font-black text-rose-400">
+                        <span className="text-sm font-extrabold text-[#111111]">
                           {formatBRL(item.price)}
                         </span>
                       </div>
@@ -934,29 +1435,133 @@ function AgendarContent() {
                       <button
                         type="button"
                         disabled={cancelingId === item.id}
-                        onClick={() => handleCancelAppointment(item.id)}
-                        className="w-full py-2 px-3 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                        onClick={() => setConfirmCancelClientAppt(item)}
+                        className="w-full py-3.5 px-4 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm smooth-press cursor-pointer"
                       >
-                        {cancelingId === item.id ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>Desmarcando...</span>
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="w-3.5 h-3.5" />
-                            <span>Desmarcar este horário</span>
-                          </>
-                        )}
+                        <XCircle className="w-4 h-4 stroke-[2.2]" />
+                        <span>Desmarcar horário</span>
                       </button>
                     </div>
                   ))
                 )}
               </div>
             )}
-          </div>
-        </div>
-      )}
+      </AnimatedModal>
+
+      {/* ==================== MODAL: CONFIRMAR DESMARCAÇÃO PELA CLIENTE ==================== */}
+      <AnimatedModal
+        open={Boolean(confirmCancelClientAppt)}
+        onClose={() => setConfirmCancelClientAppt(null)}
+        roundedClass="rounded-[32px]"
+      >
+        {confirmCancelClientAppt && (
+          <>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-5 h-5 text-red-600 stroke-[2.2]" />
+                </div>
+                <div>
+                  <h3 className="text-[17px] font-extrabold text-[#111111] leading-snug">
+                    Desmarcar Horário
+                  </h3>
+                  <p className="text-[12px] text-[#78716C] leading-snug mt-0.5">
+                    Confirme os dados antes de
+                    <br />
+                    desmarcar seu agendamento
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setConfirmCancelClientAppt(null)}
+                aria-label="Fechar"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[#78716C] hover:bg-black/5 smooth-press cursor-pointer"
+              >
+                <X className="w-4 h-4 stroke-[2.2]" />
+              </button>
+            </div>
+
+            <div className="p-5 rounded-[22px] bg-[#F4F1EC] border border-[#E8E2D9] space-y-4">
+              <div className="flex items-start justify-between gap-3 pb-3.5 border-b border-[#E5DFD5]">
+                <div>
+                  <span className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[#78716C]">
+                    PROCEDIMENTO
+                  </span>
+                  <h4 className="text-[16px] font-extrabold text-[#111111] mt-0.5">
+                    {confirmCancelClientAppt.serviceName}
+                  </h4>
+                </div>
+                <span className="text-[17px] font-extrabold text-[#111111] shrink-0">
+                  {formatBRL(confirmCancelClientAppt.price)}
+                </span>
+              </div>
+
+              <div className="space-y-3.5">
+                <div className="flex items-center gap-3">
+                  <Calendar className="w-4 h-4 text-[#111111] shrink-0 stroke-[2]" />
+                  <div>
+                    <span className="block text-[9px] font-bold uppercase tracking-[0.08em] text-[#78716C]">
+                      DATA & HORÁRIO
+                    </span>
+                    <p className="text-[13px] font-semibold text-[#111111]">
+                      {formatModalDateAndTime(
+                        confirmCancelClientAppt.date,
+                        confirmCancelClientAppt.time
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <User className="w-4 h-4 text-[#111111] shrink-0 stroke-[2]" />
+                  <div>
+                    <span className="block text-[9px] font-bold uppercase tracking-[0.08em] text-[#78716C]">
+                      CLIENTE
+                    </span>
+                    <p className="text-[13px] font-semibold text-[#111111]">
+                      {confirmCancelClientAppt.clientName}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-1">
+              <button
+                type="button"
+                disabled={cancelingId === confirmCancelClientAppt.id}
+                onClick={async () => {
+                  await handleCancelAppointment(confirmCancelClientAppt.id);
+                  setConfirmCancelClientAppt(null);
+                }}
+                className="w-full py-4 px-5 rounded-[18px] bg-red-600 hover:bg-red-700 text-white font-bold text-[14px] flex items-center justify-center gap-2 shadow-md smooth-press disabled:opacity-60 cursor-pointer"
+              >
+                {cancelingId === confirmCancelClientAppt.id ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Desmarcando...</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-4 h-4 stroke-[2.5]" />
+                    <span>Confirmar e Desmarcar</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setConfirmCancelClientAppt(null)}
+                className="w-full py-2 text-center text-[13px] font-semibold text-[#57534E] hover:text-[#111111] smooth-press cursor-pointer"
+              >
+                Voltar sem desmarcar
+              </button>
+            </div>
+          </>
+        )}
+      </AnimatedModal>
     </div>
   );
 }
@@ -965,9 +1570,9 @@ export default function AgendarPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#120b10] flex flex-col items-center justify-center p-6">
-          <Loader2 className="w-9 h-9 text-rose-400 animate-spin mb-2" />
-          <p className="text-xs text-rose-200 uppercase tracking-widest">
+        <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center p-6">
+          <Loader2 className="w-8 h-8 text-[#111111] animate-spin mb-2" />
+          <p className="text-xs text-[#78716C] uppercase tracking-widest">
             Carregando Agenda...
           </p>
         </div>

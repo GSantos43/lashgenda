@@ -36,11 +36,22 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { serviceId, date, time, clientName, clientPhone, clientNotes } = body;
+    const {
+      serviceId,
+      date,
+      time,
+      clientName,
+      clientPhone,
+      clientAddress,
+      clientNotes,
+    } = body;
 
-    if (!serviceId || !date || !time || !clientName || !clientPhone) {
+    if (!serviceId || !date || !time || !clientName || !clientPhone || !clientAddress?.trim()) {
       return NextResponse.json(
-        { error: "Preencha todos os campos obrigatórios (procedimento, data, horário, nome e WhatsApp)." },
+        {
+          error:
+            "Preencha todos os campos obrigatórios (procedimento, data, horário, nome, WhatsApp e endereço).",
+        },
         { status: 400 }
       );
     }
@@ -129,13 +140,14 @@ export async function POST(req: NextRequest) {
         time,
         clientName: clientName.trim(),
         clientPhone: normalizedPhone,
+        clientAddress: (clientAddress || "").trim(),
         clientNotes: (clientNotes || "").trim(),
         status: "agendado",
       },
     });
 
     const formattedDate = date.split("-").reverse().join("/");
-    const msg = `✨ *Novo Agendamento Confirmado!*\n\n👩 *Cliente:* ${clientName.trim()}\n💆‍♀️ *Procedimento:* ${service.name} (${formatCurrencyBR(service.price)})\n📅 *Data:* ${formattedDate} às *${time}*\n⏱ *Duração estimada:* ${service.duration}`;
+    const msg = `✨ *Novo Agendamento Confirmado!*\n\n👩 *Cliente:* ${clientName.trim()}\n💆‍♀️ *Procedimento:* ${service.name} (${formatCurrencyBR(service.price)})\n📅 *Data:* ${formattedDate} às *${time}*\n📍 *Endereço (Domicílio):* ${(clientAddress || "").trim()}`;
 
     await prisma.whatsappEvent.create({
       data: {

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Globe,
   MessageCircle,
@@ -78,11 +78,30 @@ const WHATSAPP_BUTTON_STYLE = {
 
 export default function LinktreeHomePage() {
   const router = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [config, setConfig] = useState<StudioConfig | null>(null);
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [copiedToast, setCopiedToast] = useState(false);
+  const [enterKey, setEnterKey] = useState(0);
+
+  useEffect(() => {
+    setNavigatingTo(null);
+    setEnterKey((k) => k + 1);
+  }, [pathname]);
+
+  useEffect(() => {
+    const resetNavigation = () => setNavigatingTo(null);
+    window.addEventListener("pageshow", resetNavigation);
+    window.addEventListener("popstate", resetNavigation);
+    window.addEventListener("focus", resetNavigation);
+    return () => {
+      window.removeEventListener("pageshow", resetNavigation);
+      window.removeEventListener("popstate", resetNavigation);
+      window.removeEventListener("focus", resetNavigation);
+    };
+  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -102,14 +121,18 @@ export default function LinktreeHomePage() {
   }, []);
 
   const getWhatsAppUrl = (customText?: string) => {
-    const phone = (config?.whatsapp || "11999999999").replace(/\D/g, "");
+    const rawPhone = (config?.whatsapp || "5577988350460").replace(/\D/g, "");
+    const phone =
+      !rawPhone || rawPhone === "11999999999" || rawPhone === "5511999999999"
+        ? "5577988350460"
+        : rawPhone;
     const fullPhone = phone.startsWith("55") ? phone : `55${phone}`;
     const text = encodeURIComponent(
       customText ||
         config?.whatsappMessageTemplate ||
         "Olá! Vim pelo Link da Bio e gostaria de agendar um horário ✨"
     );
-    return `https://wa.me/${fullPhone}?text=${text}`;
+    return `https://api.whatsapp.com/send?phone=${fullPhone}&text=${text}`;
   };
 
   const getInstagramUrl = () => {
@@ -142,6 +165,7 @@ export default function LinktreeHomePage() {
     }
 
     router.push(item.url);
+    setTimeout(() => setNavigatingTo(null), 500);
   };
 
   const handleShare = async (urlToShare?: string) => {
@@ -185,9 +209,15 @@ export default function LinktreeHomePage() {
       )}
 
       {/* Main Linktree Card Container (Neutral #FAF7F2 with subtle Tertiary #C5A880 border & reduced border-radius) */}
-      <main className="w-full max-w-[560px] min-h-screen sm:min-h-[820px] bg-[#FAF7F2] sm:rounded-2xl sm:border sm:border-[#C5A880]/40 sm:shadow-[0_20px_60px_rgba(0,0,0,0.45)] px-4 sm:px-6 pt-6 pb-14 flex flex-col items-center relative">
+      <main
+        key={enterKey}
+        className="w-full max-w-[560px] min-h-screen sm:min-h-[820px] bg-[#FAF7F2] sm:rounded-2xl sm:border sm:border-[#C5A880]/40 sm:shadow-[0_20px_60px_rgba(0,0,0,0.45)] px-4 sm:px-6 pt-6 pb-14 flex flex-col items-center relative animate-card"
+      >
         {/* Top Share Button */}
-        <div className="w-full flex justify-end mb-1">
+        <div
+          className="w-full flex justify-end mb-1 animate-card"
+          style={{ animationDelay: "40ms" }}
+        >
           <button
             type="button"
             onClick={() => handleShare()}
@@ -199,13 +229,13 @@ export default function LinktreeHomePage() {
         </div>
 
         {/* Avatar with Tertiary (#C5A880) ring */}
-        <div className="w-24 h-24 rounded-full p-[3px] bg-gradient-to-tr from-[#C5A880] via-[#FCEEEF] to-[#C5A880] mb-3.5 shrink-0 shadow-md">
+        <div
+          className="w-24 h-24 rounded-full p-[3px] bg-gradient-to-tr from-[#C5A880] via-[#FCEEEF] to-[#C5A880] mb-3.5 shrink-0 shadow-md animate-card"
+          style={{ animationDelay: "90ms" }}
+        >
           <div className="w-full h-full rounded-full overflow-hidden bg-[#18181B]">
             <img
-              src={
-                config?.logoUrl ||
-                "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"
-              }
+              src={config?.logoUrl || "/isa.png"}
               alt={config?.studioName || "Perfil"}
               className="w-full h-full object-cover"
             />
@@ -213,18 +243,24 @@ export default function LinktreeHomePage() {
         </div>
 
         {/* Profile Title */}
-        <h1 className="text-[19px] font-semibold uppercase tracking-[0.12em] text-[#18181B] text-center leading-snug">
-          {config?.studioName || "Studio Bella Lash"}
+        <h1
+          className="text-[19px] font-semibold uppercase tracking-[0.12em] text-[#18181B] text-center leading-snug animate-card"
+          style={{ animationDelay: "140ms" }}
+        >
+          {config?.studioName || "Isabele Lash"}
         </h1>
 
         {/* Social Icons Row right below the name */}
-        <div className="flex items-center justify-center gap-3.5 mt-3 mb-7">
+        <div
+          className="flex items-center justify-center gap-3.5 mt-3 mb-7 animate-card"
+          style={{ animationDelay: "190ms" }}
+        >
           {/* Website / Agenda */}
           <button
             type="button"
             onClick={() => router.push("/agendar")}
-            title="Agendamento Online"
-            className="w-9 h-9 rounded-lg bg-[#FCEEEF] hover:bg-[#18181B] text-[#18181B] hover:text-[#FAF7F2] border border-[#C5A880]/35 flex items-center justify-center transition-colors duration-150"
+            aria-label="Agendamento Online"
+            className="w-9 h-9 rounded-lg bg-[#FCEEEF] hover:bg-[#18181B] text-[#18181B] hover:text-[#FAF7F2] border border-[#C5A880]/35 flex items-center justify-center smooth-press cursor-pointer"
           >
             <Globe className="w-[18px] h-[18px] stroke-[2]" />
           </button>
@@ -234,8 +270,8 @@ export default function LinktreeHomePage() {
             href={getInstagramUrl()}
             target="_blank"
             rel="noopener noreferrer"
-            title="Instagram"
-            className="w-9 h-9 rounded-lg bg-[#FCEEEF] hover:bg-[#18181B] text-[#18181B] hover:text-[#FAF7F2] border border-[#C5A880]/35 flex items-center justify-center transition-colors duration-150"
+            aria-label="Instagram"
+            className="w-9 h-9 rounded-lg bg-[#FCEEEF] hover:bg-[#18181B] text-[#18181B] hover:text-[#FAF7F2] border border-[#C5A880]/35 flex items-center justify-center smooth-press"
           >
             <svg
               viewBox="0 0 24 24"
@@ -257,8 +293,8 @@ export default function LinktreeHomePage() {
             href={getWhatsAppUrl()}
             target="_blank"
             rel="noopener noreferrer"
-            title="WhatsApp"
-            className="w-9 h-9 rounded-lg bg-[#FCEEEF] hover:bg-[#18181B] text-[#18181B] hover:text-[#FAF7F2] border border-[#C5A880]/35 flex items-center justify-center transition-colors duration-150"
+            aria-label="WhatsApp"
+            className="w-9 h-9 rounded-lg bg-[#FCEEEF] hover:bg-[#18181B] text-[#18181B] hover:text-[#FAF7F2] border border-[#C5A880]/35 flex items-center justify-center smooth-press"
           >
             <MessageCircle className="w-[18px] h-[18px] stroke-[2]" />
           </a>
@@ -268,8 +304,8 @@ export default function LinktreeHomePage() {
             href={getInstagramUrl()}
             target="_blank"
             rel="noopener noreferrer"
-            title="TikTok"
-            className="w-9 h-9 rounded-lg bg-[#FCEEEF] hover:bg-[#18181B] text-[#18181B] hover:text-[#FAF7F2] border border-[#C5A880]/35 flex items-center justify-center transition-colors duration-150"
+            aria-label="TikTok"
+            className="w-9 h-9 rounded-lg bg-[#FCEEEF] hover:bg-[#18181B] text-[#18181B] hover:text-[#FAF7F2] border border-[#C5A880]/35 flex items-center justify-center smooth-press"
           >
             <svg
               viewBox="0 0 24 24"
@@ -285,8 +321,8 @@ export default function LinktreeHomePage() {
             href={getMapsUrl()}
             target="_blank"
             rel="noopener noreferrer"
-            title="Localização"
-            className="w-9 h-9 rounded-lg bg-[#FCEEEF] hover:bg-[#18181B] text-[#18181B] hover:text-[#FAF7F2] border border-[#C5A880]/35 flex items-center justify-center transition-colors duration-150"
+            aria-label="Localização"
+            className="w-9 h-9 rounded-lg bg-[#FCEEEF] hover:bg-[#18181B] text-[#18181B] hover:text-[#FAF7F2] border border-[#C5A880]/35 flex items-center justify-center smooth-press"
           >
             <MapPin className="w-[18px] h-[18px] stroke-[2]" />
           </a>
@@ -294,7 +330,13 @@ export default function LinktreeHomePage() {
 
         {/* Linktree Buttons List — nearly full width of the card, reduced border radius (rounded-xl), dynamic palette */}
         <div className="w-full space-y-3">
-          {links.map((item, idx) => {
+          {links
+            .filter(
+              (item) =>
+                !item.title.toLowerCase().includes("como chegar") &&
+                !item.url.includes("maps.google")
+            )
+            .map((item, idx) => {
             const isBusy = navigatingTo === `link-${item.id}`;
             const cleanTitle = item.title.replace(
               /^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]\s*/u,
@@ -315,13 +357,14 @@ export default function LinktreeHomePage() {
             return (
               <div
                 key={item.id}
+                style={{ animationDelay: `${240 + idx * 75}ms` }}
                 onClick={() => handleLinkClick(item)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") handleLinkClick(item);
                 }}
-                className={`w-full min-h-[58px] rounded-xl px-6 py-3.5 flex items-center justify-center relative cursor-pointer transition-all duration-150 select-none active:scale-[0.99] ${style.bg} ${style.text} ${style.border} ${style.shadow}`}
+                className={`w-full min-h-[58px] rounded-xl px-6 py-3.5 flex items-center justify-center relative cursor-pointer select-none animate-card smooth-card ${style.bg} ${style.text} ${style.border} ${style.shadow}`}
               >
                 <span className="text-[13px] sm:text-[14px] font-semibold uppercase tracking-[0.1em] text-center leading-snug">
                   {isBusy ? (

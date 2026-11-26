@@ -49,15 +49,14 @@ export async function ensureSeedData() {
       update: {},
       create: {
         id: 1,
-        studioName: "Studio Bella Lash",
+        studioName: "Isabele Lash",
         professionalName: "Camila Andrade",
         tagline: "Especialista em Extensão de Cílios & Olhar Marcante ✨",
         bio: "Transformando olhares com técnicas personalizadas, fios tecnológicos de alta retenção e máximo conforto. Atendimento exclusivo com hora marcada.",
         address: "Av. Paulista, 1000 - Sala 402, Jardins - São Paulo/SP",
-        whatsapp: "11999999999",
+        whatsapp: "5577988350460",
         instagram: "@bellalash.studio",
-        logoUrl:
-          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
+        logoUrl: "/isa.png",
         coverUrl:
           "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=1000&auto=format&fit=crop&q=80",
         badgesJson: JSON.stringify([
@@ -66,16 +65,17 @@ export async function ensureSeedData() {
           "📶 Wi-Fi Grátis",
           "✨ Fios Tecnológicos Premium",
         ]),
-        themeMode: "dark-rose",
+        themeMode: "light-rose",
         minAdvanceHours: 1,
         availableSlotsJson: JSON.stringify([
-          "09:00",
-          "10:30",
+          "09:30",
+          "11:00",
+          "12:00",
           "13:30",
-          "15:00",
-          "16:30",
-          "18:00",
-          "19:30",
+          "15:15",
+          "17:00",
+          "18:30",
+          "19:45",
         ]),
         portfolioJson: JSON.stringify([
           "https://images.unsplash.com/photo-1583001931096-959e9a1a6223?w=600&auto=format&fit=crop&q=80",
@@ -136,7 +136,7 @@ export async function ensureSeedData() {
           url: "https://maps.google.com/?q=Av.+Paulista+1000+Sao+Paulo",
           icon: "map-pin",
           highlight: false,
-          active: true,
+          active: false,
           order: 5,
         },
       ],
@@ -187,17 +187,17 @@ export async function ensureSeedData() {
           order: 3,
         },
         {
-          name: "Clássico Fio a Fio (Efeito Rímel)",
+          name: "Clássico Fio a Fio",
           category: "Extensão de Cílios",
           description:
             "Técnica ultra natural onde aplicamos 1 fio sintético de seda sobre cada fio natural. Alonga e define como se você estivesse sempre de máscara de cílios.",
-          price: 145,
+          price: 190,
           duration: "1h 30min",
           imageUrl:
             "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=700&auto=format&fit=crop&q=80",
-          featured: false,
+          featured: true,
           active: true,
-          order: 4,
+          order: 1,
         },
         {
           name: "Volume Russo / Mega Volume",
@@ -263,6 +263,71 @@ export async function ensureSeedData() {
           featured: false,
           active: true,
           order: 9,
+        },
+      ],
+    });
+  }
+
+  const appointmentsCount = await prisma.appointment.count();
+  if (appointmentsCount === 0) {
+    const today = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+
+    await prisma.appointment.createMany({
+      data: [
+        {
+          serviceName: "Clássico Fio a Fio",
+          price: 190,
+          duration: "1h 30min",
+          date: today,
+          time: "09:30",
+          clientName: "Beatriz Lima",
+          clientPhone: "11988881111",
+          status: "concluido",
+        },
+        {
+          serviceName: "Manutenção 21 Dias",
+          price: 120,
+          duration: "1h 15min",
+          date: today,
+          time: "11:30",
+          clientName: "Juliana Rossi",
+          clientPhone: "11988882222",
+          status: "agendado",
+        },
+        {
+          serviceName: "Volume Russo • Fox Eyes",
+          price: 300,
+          duration: "2h 00min",
+          date: today,
+          time: "14:00",
+          clientName: "Mariana Sampaio",
+          clientPhone: "11988883333",
+          status: "concluido",
+        },
+        {
+          serviceName: "Lash Lifting + Nutrição",
+          price: 150,
+          duration: "1h 15min",
+          date: today,
+          time: "16:30",
+          clientName: "Fernanda Costa",
+          clientPhone: "11988884444",
+          status: "agendado",
+        },
+        {
+          serviceName: "Remoção + Lash Botox",
+          price: 90,
+          duration: "45 min",
+          date: today,
+          time: "18:00",
+          clientName: "Gabriela Dias",
+          clientPhone: "11988885555",
+          status: "agendado",
         },
       ],
     });

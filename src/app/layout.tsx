@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const jakartaSans = Plus_Jakarta_Sans({
+  variable: "--font-jakarta-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 const geistMono = Geist_Mono({
@@ -13,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Studio Bella Lash | Extensão de Cílios & Agendamento Online",
+  title: "Bella Lash | Extensão de Cílios & Agendamento Online",
   description:
     "Agende seu procedimento de extensão de cílios online, confira nosso catálogo de técnicas e fale direto pelo WhatsApp.",
 };
@@ -26,9 +27,9 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${jakartaSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#120b10] text-rose-50 selection:bg-rose-500/30 selection:text-rose-100">
+      <body className="min-h-full flex flex-col bg-[#FAF8F5] text-[#111111] selection:bg-[#EADCE0] selection:text-[#111111]">
         {children}
       </body>
     </html>
