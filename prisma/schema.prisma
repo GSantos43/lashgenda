@@ -102,6 +102,7 @@ model BlockedClient {
 model WhatsappEvent {
   id            Int      @id @default(autoincrement())
   type          String   // "novo_agendamento", "cancelamento_cliente", "lembrete"
+  appointmentId Int?
   clientName    String
   clientPhone   String
   serviceName   String

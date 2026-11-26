@@ -1,5 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { prisma, ensureSeedData, normalizePhone } from "@/lib/prisma";
+
+interface LoginAttemptRecord {
+  count: number;
+  firstAttemptAt: number;
+  lockedUntil: number;
+}
+
+const MAX_LOGIN_ATTEMPTS = 5;
+const ATTEMPT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+const globalForRateLimit = globalThis as unknown as {
+  __adminLoginAttempts?: Map<string, LoginAttemptRecord>;
+};
+
+const loginAttemptsMap =
+  globalForRateLimit.__adminLoginAttempts ??
+  (globalForRateLimit.__adminLoginAttempts = new Map<
+    string,
+    LoginAttemptRecord
+  >());
+
+function getClientIp(req: NextRequest): string {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0].trim();
+  }
+  return req.headers.get("x-real-ip")?.trim() || "local-client";
+}
+
+function safeCompare(a: string, b: string): boolean {
+  const hashA = crypto.createHash("sha256").update(a).digest();
+  const hashB = crypto.createHash("sha256").update(b).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
+}
 
 
 async function checkAuth(req: NextRequest): Promise<boolean> {
@@ -70,18 +106,71 @@ export async function POST(req: NextRequest) {
     const { action } = body;
 
     if (action === "login") {
+      const clientIp = getClientIp(req);
+      const now = Date.now();
+      const record = loginAttemptsMap.get(clientIp);
+
+      if (record && record.lockedUntil > now) {
+        const remainingMinutes = Math.ceil(
+          (record.lockedUntil - now) / (60 * 1000)
+        );
+        return NextResponse.json(
+          {
+            error: `Muitas tentativas falhas. Tente novamente em ${remainingMinutes} min.`,
+          },
+          { status: 429 }
+        );
+      }
+
       const { username, password } = body;
       const config = await prisma.studioConfig.findUnique({ where: { id: 1 } });
-      if (
-        !config ||
-        username?.trim() !== config.adminUsername ||
-        password !== config.adminPassword
-      ) {
+      const inputUser = String(username || "").trim();
+      const inputPass = String(password || "");
+      const validUser = config
+        ? safeCompare(inputUser, config.adminUsername)
+        : false;
+      const validPass = config
+        ? safeCompare(inputPass, config.adminPassword)
+        : false;
+
+      if (!config || !validUser || !validPass) {
+        const prev =
+          record && now - record.firstAttemptAt < ATTEMPT_WINDOW_MS
+            ? record
+            : { count: 0, firstAttemptAt: now, lockedUntil: 0 };
+        const nextCount = prev.count + 1;
+        const lockedUntil =
+          nextCount >= MAX_LOGIN_ATTEMPTS ? now + LOCKOUT_DURATION_MS : 0;
+
+        loginAttemptsMap.set(clientIp, {
+          count: nextCount,
+          firstAttemptAt: prev.firstAttemptAt,
+          lockedUntil,
+        });
+
+        if (lockedUntil > now) {
+          return NextResponse.json(
+            {
+              error:
+                "Limite de tentativas excedido. Acesso bloqueado temporariamente por 15 minutos.",
+            },
+            { status: 429 }
+          );
+        }
+
+        const remaining = MAX_LOGIN_ATTEMPTS - nextCount;
         return NextResponse.json(
-          { error: "Usuário ou senha incorretos." },
+          {
+            error:
+              remaining <= 2
+                ? `Usuário ou senha incorretos. (${remaining} tentativa${remaining === 1 ? "" : "s"} restante${remaining === 1 ? "" : "s"})`
+                : "Usuário ou senha incorretos.",
+          },
           { status: 401 }
         );
       }
+
+      loginAttemptsMap.delete(clientIp);
 
       const token = Buffer.from(
         `${config.adminUsername}:${config.adminPassword}`
@@ -313,7 +402,7 @@ export async function POST(req: NextRequest) {
       }
       await prisma.appointment.create({
         data: {
-          serviceId: service.id,
+          service: { connect: { id: service.id } },
           serviceName: service.name,
           price: service.price,
           duration: service.duration,
@@ -409,6 +498,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         message: "Histórico de avisos limpo!",
+      });
+    }
+
+    if (action === "mark_notification_read") {
+      const { id } = body;
+      if (id) {
+        await prisma.whatsappEvent.update({
+          where: { id: Number(id) },
+          data: { read: true },
+        });
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "mark_all_notifications_read") {
+      await prisma.whatsappEvent.updateMany({
+        where: { read: false },
+        data: { read: true },
+      });
+      return NextResponse.json({
+        success: true,
+        message: "Todas as notificações marcadas como lidas!",
       });
     }
 

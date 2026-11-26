@@ -1,9 +1,21 @@
 "use client";
 
-import React, { useState } from "react";
-import { DayPicker } from "react-day-picker";
+import React, { useMemo, useState } from "react";
+import {
+  addDays,
+  addMonths,
+  endOfMonth,
+  endOfWeek,
+  format,
+  isBefore,
+  isSameDay,
+  isSameMonth,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  subMonths,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { addMonths, format, subMonths } from "date-fns";
 import {
   Calendar as CalendarIcon,
   ChevronDown,
@@ -12,7 +24,6 @@ import {
   X,
 } from "lucide-react";
 import { AnimatedModal } from "@/components/AnimatedModal";
-import "react-day-picker/style.css";
 
 interface DatePickerProps {
   value: string; // YYYY-MM-DD
@@ -22,6 +33,8 @@ interface DatePickerProps {
   variant?: "banner" | "pill" | "input" | "compact";
   title?: string;
 }
+
+const WEEKDAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 function parseLocalYYYYMMDD(dateStr: string): Date {
   if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
@@ -56,26 +69,44 @@ export function DatePicker({
   const hasValidValue = Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
   const selectedDateObj = hasValidValue ? parseLocalYYYYMMDD(value) : undefined;
   const [month, setMonth] = useState<Date>(() =>
-    hasValidValue ? parseLocalYYYYMMDD(value) : new Date()
+    hasValidValue ? startOfMonth(parseLocalYYYYMMDD(value)) : startOfMonth(new Date())
   );
 
-  const minDateObj = minDate ? parseLocalYYYYMMDD(minDate) : undefined;
-  if (minDateObj) {
-    minDateObj.setHours(0, 0, 0, 0);
-  }
+  const todayObj = useMemo(() => startOfDay(new Date()), []);
+  const minDateObj = useMemo(
+    () => (minDate && /^\d{4}-\d{2}-\d{2}$/.test(minDate) ? startOfDay(parseLocalYYYYMMDD(minDate)) : undefined),
+    [minDate]
+  );
+
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(month);
+    const monthEnd = endOfMonth(monthStart);
+    const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+
+    const days: Date[] = [];
+    let curr = gridStart;
+    while (curr <= gridEnd) {
+      days.push(curr);
+      curr = addDays(curr, 1);
+    }
+    return days;
+  }, [month]);
 
   const handleOpen = () => {
-    setMonth(hasValidValue ? parseLocalYYYYMMDD(value) : new Date());
+    setMonth(
+      hasValidValue
+        ? startOfMonth(parseLocalYYYYMMDD(value))
+        : startOfMonth(new Date())
+    );
     setOpen(true);
   };
 
-  const handleSelectDay = (day: Date | undefined) => {
-    if (!day) return;
+  const handleSelectDay = (day: Date) => {
+    if (minDateObj && isBefore(startOfDay(day), minDateObj)) return;
     const formatted = formatToYYYYMMDD(day);
+    onChange(formatted);
     setOpen(false);
-    requestAnimationFrame(() => {
-      onChange(formatted);
-    });
   };
 
   const selectQuickOffset = (offsetDays: number) => {
@@ -83,11 +114,9 @@ export function DatePicker({
     d.setDate(d.getDate() + offsetDays);
     const formatted = formatToYYYYMMDD(d);
     if (minDate && formatted < minDate) return;
-    setMonth(d);
+    setMonth(startOfMonth(d));
+    onChange(formatted);
     setOpen(false);
-    requestAnimationFrame(() => {
-      onChange(formatted);
-    });
   };
 
   const monthLabel = format(month, "MMMM yyyy", { locale: ptBR });
@@ -100,12 +129,24 @@ export function DatePicker({
         <button
           type="button"
           onClick={handleOpen}
-          className="w-full py-3.5 px-4 rounded-[18px] bg-[#F3EFEA] hover:bg-[#EBE5DE] text-[#111111] font-extrabold text-[15px] flex items-center justify-between gap-2.5 smooth-press cursor-pointer transition"
+          className={`w-full py-3.5 px-4 rounded-[18px] font-extrabold text-[15px] flex items-center justify-between gap-2.5 smooth-press cursor-pointer transition ${
+            hasValidValue
+              ? "bg-[#09090B] hover:bg-zinc-800 text-white shadow-sm"
+              : "bg-[#F3EFEA] hover:bg-[#EBE5DE] text-[#111111]"
+          }`}
         >
           <span className="flex items-center gap-2.5 mx-auto">
-            <CalendarIcon className="w-4 h-4 text-[#111111] stroke-[2.2]" />
+            <CalendarIcon
+              className={`w-4 h-4 stroke-[2.2] ${
+                hasValidValue ? "text-white" : "text-[#111111]"
+              }`}
+            />
             <span>{label || formatDisplayBR(value)}</span>
-            <ChevronDown className="w-4 h-4 text-[#78716C] stroke-[2.2]" />
+            <ChevronDown
+              className={`w-4 h-4 stroke-[2.2] ${
+                hasValidValue ? "text-white/80" : "text-[#78716C]"
+              }`}
+            />
           </span>
         </button>
       )}
@@ -209,12 +250,12 @@ export function DatePicker({
           </button>
         </div>
 
-        {/* Custom Month Navigation Header + React Day Picker */}
-        <div className="bg-[#FAF8F5] rounded-[22px] p-3.5 border border-[#EFECE6] space-y-2">
+        {/* Custom Month Navigation Header + Calendar Grid */}
+        <div className="bg-[#FAF8F5] rounded-[22px] p-3.5 border border-[#EFECE6] space-y-2.5">
           <div className="flex items-center justify-between px-1 pb-1">
             <button
               type="button"
-              onClick={() => setMonth((m) => subMonths(m, 1))}
+              onClick={() => setMonth((m) => startOfMonth(subMonths(m, 1)))}
               aria-label="Mês anterior"
               className="w-8 h-8 rounded-xl bg-white border border-[#E5E0D8] hover:bg-[#F3EFEA] flex items-center justify-center text-[#111111] smooth-press cursor-pointer"
             >
@@ -227,7 +268,7 @@ export function DatePicker({
 
             <button
               type="button"
-              onClick={() => setMonth((m) => addMonths(m, 1))}
+              onClick={() => setMonth((m) => startOfMonth(addMonths(m, 1)))}
               aria-label="Próximo mês"
               className="w-8 h-8 rounded-xl bg-white border border-[#E5E0D8] hover:bg-[#F3EFEA] flex items-center justify-center text-[#111111] smooth-press cursor-pointer"
             >
@@ -235,39 +276,53 @@ export function DatePicker({
             </button>
           </div>
 
-          <div className="flex justify-center">
-            <DayPicker
-              mode="single"
-              locale={ptBR}
-              month={month}
-              onMonthChange={setMonth}
-              selected={selectedDateObj}
-              onSelect={handleSelectDay}
-              showOutsideDays
-              hideNavigation
-              disabled={minDateObj ? { before: minDateObj } : undefined}
-              classNames={{
-                month_caption: "hidden",
-              }}
-              style={
-                {
-                  "--rdp-accent-color": "#111111",
-                  "--rdp-accent-background-color": "#EADCE0",
-                  "--rdp-day-height": "40px",
-                  "--rdp-day-width": "40px",
-                  "--rdp-day_button-height": "38px",
-                  "--rdp-day_button-width": "38px",
-                  "--rdp-day_button-border-radius": "12px",
-                  "--rdp-today-color": "#9D5C6D",
-                  margin: 0,
-                } as React.CSSProperties
-              }
-              modifiersClassNames={{
-                selected:
-                  "!bg-[#111111] !text-white font-extrabold rounded-[12px] shadow-sm",
-                today: "font-extrabold text-[#9D5C6D] underline",
-              }}
-            />
+          {/* Weekday Headers */}
+          <div className="grid grid-cols-7 gap-1 text-center">
+            {WEEKDAY_LABELS.map((wd) => (
+              <div
+                key={wd}
+                className="text-[11px] font-bold text-[#78716C] py-1 select-none"
+              >
+                {wd}
+              </div>
+            ))}
+          </div>
+
+          {/* Days Grid */}
+          <div className="grid grid-cols-7 gap-1">
+            {calendarDays.map((day) => {
+              const dateKey = formatToYYYYMMDD(day);
+              const isCurrentMonth = isSameMonth(day, month);
+              const isSelected = Boolean(
+                selectedDateObj && isSameDay(day, selectedDateObj)
+              );
+              const isToday = isSameDay(day, todayObj);
+              const isDisabled = Boolean(
+                minDateObj && isBefore(startOfDay(day), minDateObj)
+              );
+
+              return (
+                <button
+                  key={dateKey}
+                  type="button"
+                  disabled={isDisabled}
+                  onClick={() => handleSelectDay(day)}
+                  className={`h-10 w-full rounded-[12px] text-[13px] flex items-center justify-center transition smooth-press ${
+                    isDisabled
+                      ? "text-[#D0CBC3] opacity-45 cursor-not-allowed"
+                      : isSelected
+                      ? "bg-[#111111] text-white font-extrabold shadow-sm cursor-pointer"
+                      : isToday
+                      ? "bg-[#EADCE0]/60 text-[#9D5C6D] font-extrabold underline cursor-pointer hover:bg-[#EADCE0]"
+                      : isCurrentMonth
+                      ? "text-[#111111] font-semibold hover:bg-[#EADCE0]/50 cursor-pointer"
+                      : "text-[#A8A29E] font-medium opacity-70 hover:bg-[#EFECE6] cursor-pointer"
+                  }`}
+                >
+                  {day.getDate()}
+                </button>
+              );
+            })}
           </div>
         </div>
       </AnimatedModal>

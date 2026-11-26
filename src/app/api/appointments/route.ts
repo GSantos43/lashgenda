@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
 
     const appointment = await prisma.appointment.create({
       data: {
-        serviceId: service.id,
+        service: { connect: { id: service.id } },
         serviceName: service.name,
         price: service.price,
         duration: service.duration,
@@ -152,6 +152,7 @@ export async function POST(req: NextRequest) {
     await prisma.whatsappEvent.create({
       data: {
         type: "novo_agendamento",
+        appointmentId: appointment.id,
         clientName: clientName.trim(),
         clientPhone: normalizedPhone,
         serviceName: service.name,
@@ -218,6 +219,7 @@ export async function PATCH(req: NextRequest) {
     await prisma.whatsappEvent.create({
       data: {
         type: "cancelamento_cliente",
+        appointmentId: appointment.id,
         clientName: appointment.clientName,
         clientPhone: appointment.clientPhone,
         serviceName: appointment.serviceName,

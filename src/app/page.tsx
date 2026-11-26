@@ -85,6 +85,49 @@ export default function LinktreeHomePage() {
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [copiedToast, setCopiedToast] = useState(false);
   const [enterKey, setEnterKey] = useState(0);
+  const [psalm, setPsalm] = useState<{ text: string; ref: string } | null>(
+    null
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+    setPsalm(null);
+    const chapter = Math.floor(Math.random() * 150) + 1;
+
+    fetch(`https://bolls.life/get-text/ARA/19/${chapter}/`, {
+      signal: controller.signal,
+      cache: "no-store",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((verses) => {
+        if (cancelled || !Array.isArray(verses) || verses.length === 0) return;
+        const picked = verses[Math.floor(Math.random() * verses.length)];
+        const cleanText = String(picked?.text || "")
+          .replace(/<[^>]*>/g, "")
+          .trim();
+        if (cleanText) {
+          setPsalm({
+            text: cleanText,
+            ref: `Salmos ${chapter}:${picked.verse}`,
+          });
+        }
+      })
+      .catch(() => {
+        // Silent fail on timeout or network error
+      })
+      .finally(() => {
+        clearTimeout(timeoutId);
+      });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [enterKey]);
 
   useEffect(() => {
     setNavigatingTo(null);
@@ -296,7 +339,18 @@ export default function LinktreeHomePage() {
             aria-label="WhatsApp"
             className="w-9 h-9 rounded-lg bg-[#FCEEEF] hover:bg-[#18181B] text-[#18181B] hover:text-[#FAF7F2] border border-[#C5A880]/35 flex items-center justify-center smooth-press"
           >
-            <MessageCircle className="w-[18px] h-[18px] stroke-[2]" />
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-[18px] h-[18px]"
+            >
+              <path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" />
+              <path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1a5 5 0 0 0 5 5h1a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1" />
+            </svg>
           </a>
 
           {/* TikTok SVG */}
@@ -380,6 +434,21 @@ export default function LinktreeHomePage() {
             );
           })}
         </div>
+
+        {/* Psalm at the bottom of the Linktree Home */}
+        {psalm && (
+          <div
+            key={psalm.ref}
+            className="mt-auto pt-8 px-4 max-w-[420px] text-center animate-psalm-fade"
+          >
+            <p className="text-[12px] italic text-[#18181B]/75 leading-relaxed">
+              “{psalm.text}”
+            </p>
+            <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#18181B]/60 mt-1.5">
+              {psalm.ref}
+            </span>
+          </div>
+        )}
       </main>
     </div>
   );

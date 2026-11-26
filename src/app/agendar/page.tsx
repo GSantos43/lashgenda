@@ -171,7 +171,9 @@ function formatShortSubtitleDate(dateStr: string): string {
 
 function formatModalDateAndTime(dateStr: string, timeStr: string): string {
   const { day, monthIndex, weekdayIndex } = parseDateParts(dateStr);
-  return `${WEEKDAYS_SHORT_PT[weekdayIndex]}, ${day} de ${MONTHS_PT[monthIndex]} às ${timeStr}`;
+  const dd = String(day).padStart(2, "0");
+  const mm = String(monthIndex + 1).padStart(2, "0");
+  return `${WEEKDAYS_SHORT_PT[weekdayIndex]}, ${dd}/${mm} - ${timeStr}h`;
 }
 
 function formatPhoneMask(val: string): string {
@@ -335,6 +337,17 @@ function AgendarContent() {
     }
     return formatBRL(num);
   };
+
+  const phoneDigits = clientPhone.replace(/\D/g, "");
+  const isFormReady = Boolean(
+    selectedServiceId &&
+      selectedDate &&
+      selectedTime &&
+      clientName.trim().length >= 2 &&
+      phoneDigits.length >= 10 &&
+      phoneDigits.length <= 11 &&
+      clientAddress.trim().length >= 5
+  );
 
   // Validate form and open "Conferir Agendamento" modal (Figma node 1-2)
   const handleOpenReviewModal = (e: React.FormEvent) => {
@@ -528,9 +541,19 @@ function AgendarContent() {
   return (
     <div
       key={enterKey}
-      className="min-h-screen bg-[#FAF8F5] text-[#111111] pb-12 font-sans"
+      className={`${
+        bookingSuccess
+          ? "h-dvh overflow-hidden"
+          : "min-h-screen pb-12"
+      } bg-[#FAF8F5] text-[#111111] font-sans`}
     >
-      <div className="max-w-[440px] mx-auto min-h-screen bg-[#FAF8F5] relative">
+      <div
+        className={`max-w-[440px] mx-auto ${
+          bookingSuccess
+            ? "h-dvh overflow-hidden flex flex-col"
+            : "min-h-screen"
+        } bg-[#FAF8F5] relative`}
+      >
         {/* TOP STICKY HEADER + STEPPER BAR (Figma Node 1-214) */}
         <header className="sticky top-0 z-30 bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#EFECE6]/80 animate-card">
           <div className="px-5 pt-5 pb-3 flex items-center justify-between">
@@ -636,19 +659,112 @@ function AgendarContent() {
           </div>
         </header>
 
-        <main className="px-5 pt-2 space-y-6">
+        <main
+          className={`px-5 ${
+            bookingSuccess
+              ? "flex-1 flex flex-col justify-center pb-6 overflow-hidden"
+              : "pt-2 space-y-6"
+          }`}
+        >
           {/* SUCCESS SCREEN IF BOOKING COMPLETED */}
           {bookingSuccess ? (
-            <div className="p-6 rounded-[24px] bg-white border border-[#E5E0D8] space-y-5 text-center shadow-sm mt-2 animate-modal">
-              <div className="w-16 h-16 mx-auto rounded-full bg-[#10B981]/15 flex items-center justify-center">
-                <CheckCircle2 className="w-8 h-8 text-[#10B981]" />
+            <div className="p-6 rounded-[24px] bg-white border border-[#E5E0D8] space-y-5 text-center shadow-sm animate-modal">
+              <div className="w-28 h-28 mx-auto flex items-center justify-center -my-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 512 512"
+                  role="img"
+                  aria-label="Confirmação concluída"
+                  className="w-28 h-28"
+                >
+                  <g transform="translate(256 256)">
+                    <g>
+                      <animateTransform
+                        attributeName="transform"
+                        type="scale"
+                        dur="1s"
+                        values="0 0; 1.1 1.1; 1 1; 1 1"
+                        keyTimes="0; .2; .3; 1"
+                        calcMode="spline"
+                        keySplines=".2 0 .33 1; .2 0 .33 1; 0 0 1 1"
+                        fill="freeze"
+                      />
+                      <circle r="150" fill="#22c55e" />
+                    </g>
+
+                    <g opacity="0">
+                      <animate
+                        attributeName="opacity"
+                        begin=".233s"
+                        dur=".4s"
+                        values=".7; 0"
+                        keyTimes="0; 1"
+                        calcMode="spline"
+                        keySplines=".2 0 .33 1"
+                        fill="freeze"
+                      />
+                      <animateTransform
+                        attributeName="transform"
+                        type="scale"
+                        begin=".233s"
+                        dur=".4s"
+                        values="1 1; 1.5 1.5"
+                        keyTimes="0; 1"
+                        calcMode="spline"
+                        keySplines=".2 0 .33 1"
+                        fill="freeze"
+                      />
+                      <circle
+                        r="150"
+                        fill="none"
+                        stroke="#22c55e"
+                        strokeWidth="8"
+                      />
+                    </g>
+
+                    <g>
+                      <animateTransform
+                        attributeName="transform"
+                        type="scale"
+                        dur="1s"
+                        values="1 1; 1 1; 1.12 1.12; 1 1; 1 1"
+                        keyTimes="0; .433; .533; .667; 1"
+                        calcMode="spline"
+                        keySplines="0 0 1 1; .2 0 .33 1; .2 0 .33 1; 0 0 1 1"
+                        fill="freeze"
+                      />
+                      <path
+                        d="M-72 4 L-22 54 L78 -50"
+                        fill="none"
+                        stroke="#fff"
+                        strokeWidth="30"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeDasharray="240"
+                        strokeDashoffset="240"
+                      >
+                        <animate
+                          attributeName="stroke-dashoffset"
+                          begin=".2s"
+                          dur=".3s"
+                          from="240"
+                          to="0"
+                          calcMode="spline"
+                          keySplines=".2 0 .33 1"
+                          fill="freeze"
+                        />
+                      </path>
+                    </g>
+                  </g>
+                </svg>
               </div>
               <div className="space-y-1">
                 <span className="text-[11px] font-bold uppercase tracking-widest text-[#10B981]">
                   Reserva Confirmada
                 </span>
                 <h2 className="text-xl font-extrabold text-[#111111]">
-                  Tudo certo, {bookingSuccess.clientName}!
+                  Tudo certo,{" "}
+                  {bookingSuccess.clientName.trim().split(/\s+/)[0]}!
                 </h2>
                 <p className="text-xs text-[#78716C]">
                   Seu horário já está reservado na agenda de{" "}
@@ -695,7 +811,18 @@ function AgendarContent() {
                   rel="noopener noreferrer"
                   className="w-full py-4 px-5 rounded-[18px] bg-[#09090B] hover:bg-zinc-800 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md smooth-press"
                 >
-                  <MessageCircle className="w-4 h-4" />
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="w-4 h-4"
+                  >
+                    <path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" />
+                    <path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1a5 5 0 0 0 5 5h1a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1" />
+                  </svg>
                   <span>Enviar Comprovante no WhatsApp</span>
                 </a>
 
@@ -850,113 +977,29 @@ function AgendarContent() {
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {/* MANHÃ */}
-                    {morningSlots.length > 0 && (
-                      <div className="p-4 rounded-[22px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.02)] space-y-3 smooth-card">
-                        <div className="flex items-center gap-1.5 text-[#78716C]">
-                          <Sunrise className="w-4 h-4 stroke-[2]" />
-                          <span className="text-[11px] font-bold uppercase tracking-[0.08em]">
-                            MANHÃ
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2.5">
-                          {morningSlots.map((slot) => {
-                            const isSelected = selectedTime === slot.time;
-                            return (
-                              <button
-                                key={slot.time}
-                                type="button"
-                                disabled={!slot.available}
-                                onClick={() => setSelectedTime(slot.time)}
-                                className={`py-3 px-2 rounded-[14px] text-[13px] font-bold smooth-press flex items-center justify-center ${
-                                  !slot.available
-                                    ? "bg-[#F7F5F2] text-[#C8C3BC] line-through cursor-not-allowed"
-                                    : isSelected
-                                    ? "bg-[#09090B] text-white shadow-sm scale-[1.02]"
-                                    : "bg-[#F3EFEA] hover:bg-[#E9E4DD] text-[#111111] cursor-pointer"
-                                }`}
-                              >
-                                {slot.time}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* TARDE */}
-                    {afternoonSlots.length > 0 && (
-                      <div className="p-4 rounded-[22px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.02)] space-y-3 smooth-card">
-                        <div className="flex items-center gap-1.5 text-[#78716C]">
-                          <Sun className="w-4 h-4 stroke-[2]" />
-                          <span className="text-[11px] font-bold uppercase tracking-[0.08em]">
-                            TARDE
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2.5">
-                          {afternoonSlots.map((slot) => {
-                            const isSelected = selectedTime === slot.time;
-                            return (
-                              <button
-                                key={slot.time}
-                                type="button"
-                                disabled={!slot.available}
-                                onClick={() => setSelectedTime(slot.time)}
-                                className={`py-3 px-2 rounded-[14px] text-[13px] font-bold smooth-press flex items-center justify-center ${
-                                  !slot.available
-                                    ? "bg-[#F7F5F2] text-[#C8C3BC] line-through cursor-not-allowed"
-                                    : isSelected
-                                    ? "bg-[#09090B] text-white shadow-sm scale-[1.02]"
-                                    : "bg-[#F3EFEA] hover:bg-[#E9E4DD] text-[#111111] cursor-pointer"
-                                }`}
-                              >
-                                {slot.time}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* NOITE */}
-                    {eveningSlots.length > 0 && (
-                      <div className="p-4 rounded-[22px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.02)] space-y-3 smooth-card">
-                        <div className="flex items-center gap-1.5 text-[#78716C]">
-                          <Moon className="w-4 h-4 stroke-[2]" />
-                          <span className="text-[11px] font-bold uppercase tracking-[0.08em]">
-                            NOITE
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2.5">
-                          {eveningSlots.map((slot) => {
-                            const isSelected = selectedTime === slot.time;
-                            return (
-                              <button
-                                key={slot.time}
-                                type="button"
-                                disabled={!slot.available}
-                                onClick={() => setSelectedTime(slot.time)}
-                                className={`py-3 px-2 rounded-[14px] text-[13px] font-bold smooth-press flex items-center justify-center ${
-                                  !slot.available
-                                    ? "bg-[#F7F5F2] text-[#C8C3BC] line-through cursor-not-allowed"
-                                    : isSelected
-                                    ? "bg-[#09090B] text-white shadow-sm scale-[1.02]"
-                                    : "bg-[#F3EFEA] hover:bg-[#E9E4DD] text-[#111111] cursor-pointer"
-                                }`}
-                              >
-                                {slot.time}
-                              </button>
-                            );
-                          })}
-                          {eveningSlots.length === 2 && (
-                            <div className="py-3 px-2 rounded-[14px] bg-[#F7F5F2] text-[#C8C3BC] text-[12px] font-semibold flex items-center justify-center select-none">
-                              Esgotado
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                  <div className="p-4 rounded-[22px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.02)] smooth-card animate-expand">
+                    <div className="grid grid-cols-4 gap-2.5">
+                      {slots.map((slot) => {
+                        const isSelected = selectedTime === slot.time;
+                        return (
+                          <button
+                            key={slot.time}
+                            type="button"
+                            disabled={!slot.available}
+                            onClick={() => setSelectedTime(slot.time)}
+                            className={`py-3 px-2 rounded-[14px] text-[13px] font-bold smooth-press flex items-center justify-center ${
+                              !slot.available
+                                ? "bg-[#F7F5F2] text-[#C8C3BC] line-through cursor-not-allowed"
+                                : isSelected
+                                ? "bg-[#09090B] text-white shadow-sm"
+                                : "bg-[#F3EFEA] hover:bg-[#E9E4DD] text-[#111111] cursor-pointer"
+                            }`}
+                          >
+                            {slot.time}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </section>
@@ -1014,7 +1057,18 @@ function AgendarContent() {
                       WHATSAPP PARA LEMBRETE
                     </label>
                     <div className="flex items-center gap-2.5">
-                      <MessageSquare className="w-4 h-4 text-[#9CA3AF] shrink-0" />
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="w-4 h-4 text-[#9CA3AF] shrink-0"
+                      >
+                        <path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" />
+                        <path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1a5 5 0 0 0 5 5h1a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1" />
+                      </svg>
                       <input
                         id="input-client-phone"
                         type="tel"
@@ -1090,7 +1144,11 @@ function AgendarContent() {
                 <button
                   type="submit"
                   disabled={submittingBooking || loadingSlots}
-                  className="w-full py-4 px-5 rounded-[20px] bg-[#09090B] hover:bg-zinc-800 text-white flex items-center justify-between shadow-[0_10px_24px_rgba(0,0,0,0.14)] smooth-press disabled:opacity-60 cursor-pointer"
+                  className={`w-full py-4 px-5 rounded-[20px] text-white flex items-center justify-between transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] smooth-press disabled:opacity-60 cursor-pointer ${
+                    isFormReady
+                      ? "bg-[#10B981] hover:bg-[#059669] shadow-[0_10px_24px_rgba(16,185,129,0.28)]"
+                      : "bg-[#09090B] hover:bg-zinc-800 shadow-[0_10px_24px_rgba(0,0,0,0.14)]"
+                  }`}
                 >
                   <span className="flex items-center gap-2.5 text-[14px] font-bold">
                     <CalendarCheck className="w-5 h-5 text-white stroke-[2]" />
