@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -17,6 +17,21 @@ export const metadata: Metadata = {
   title: "Bella Lash | Extensão de Cílios & Agendamento Online",
   description:
     "Agende seu procedimento de extensão de cílios online, confira nosso catálogo de técnicas e fale direto pelo WhatsApp.",
+  applicationName: "Bella Lash",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/pwa-icon.svg",
+    apple: "/apple-touch-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Bella Lash",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#030304",
 };
 
 export default function RootLayout({
