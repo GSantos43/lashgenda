@@ -30,10 +30,28 @@ import {
   XCircle,
   AlertTriangle,
   User,
+  MapPin,
+  Fingerprint,
+  KeyRound,
+  ShieldCheck,
+  Mail,
+  Send,
+  Server,
+  Users,
+  Activity,
+  Database,
 } from "lucide-react";
 import { DatePicker } from "@/components/DatePicker";
 import { AnimatedModal } from "@/components/AnimatedModal";
 import { ScrollArea } from "@/components/ScrollArea";
+
+interface PasskeyItem {
+  id: string;
+  name: string;
+  createdAt: string;
+  deviceType?: string;
+  backedUp?: boolean;
+}
 
 interface AdminConfig {
   id: number;
@@ -54,6 +72,20 @@ interface AdminConfig {
   whatsappMessageTemplate: string;
   adminUsername: string;
   adminPassword?: string;
+  adminEmail?: string;
+  superAdminUsername?: string;
+  superAdminPassword?: string;
+  superAdminEmail?: string;
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpUser?: string;
+  smtpPass?: string;
+  requirePasskey2FA?: boolean;
+  adminRequirePasskey2FA?: boolean;
+  superAdminRequire2FA?: boolean;
+  passkeys?: PasskeyItem[];
+  adminPasskeys?: PasskeyItem[];
+  superAdminPasskeys?: PasskeyItem[];
 }
 
 interface LinkItem {
@@ -246,16 +278,43 @@ export default function AdminDashboardPage() {
 
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
+  const [userRole, setUserRole] = useState<"admin" | "superadmin">("admin");
+  const [superTab, setSuperTab] = useState<
+    "visao_geral" | "contas" | "smtp_seguranca" | "sistema"
+  >("visao_geral");
+  const [superViewStudioMode, setSuperViewStudioMode] = useState(false);
 
   // Login states
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
+  const [hasPasskeysConfigured, setHasPasskeysConfigured] = useState(false);
+  const [awaitingPasskey2FA, setAwaitingPasskey2FA] = useState(false);
+  const [pending2FARole, setPending2FARole] = useState<
+    "admin" | "superadmin" | undefined
+  >(undefined);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
+  const [newPasskeyName, setNewPasskeyName] = useState("");
+  const [registeringPasskey, setRegisteringPasskey] = useState(false);
+  const [hasRecoveryEmailConfigured, setHasRecoveryEmailConfigured] =
+    useState(false);
+  const [maskedRecoveryEmail, setMaskedRecoveryEmail] = useState("");
+  const [recoveryIdentifier, setRecoveryIdentifier] = useState("");
+  const [recoveryStage, setRecoveryStage] = useState<
+    "idle" | "request" | "verify"
+  >("idle");
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [recoveryNewPassword, setRecoveryNewPassword] = useState("");
+  const [recoveryDisable2FA, setRecoveryDisable2FA] = useState(false);
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
+  const [recoveryMessage, setRecoveryMessage] = useState("");
+  const [showSmtpAdvanced, setShowSmtpAdvanced] = useState(false);
   const [loginAnimStage, setLoginAnimStage] = useState<
     "idle" | "fading-form" | "welcome" | "exiting"
   >("idle");
   const [tickAnimKey, setTickAnimKey] = useState(0);
+  const [welcomeDisplayName, setWelcomeDisplayName] = useState("");
 
   // Bottom Navigation Tab (Início, Catálogo, Agenda, Configurações)
   const [bottomTab, setBottomTab] = useState<
@@ -308,6 +367,36 @@ export default function AdminDashboardPage() {
     clientAddress: "",
     clientNotes: "",
   });
+  const [manualAddressStreetQuery, setManualAddressStreetQuery] =
+    useState<string>("");
+  const [manualAddressNumber, setManualAddressNumber] = useState<string>("");
+  const [manualAddressComplement, setManualAddressComplement] =
+    useState<string>("");
+  const [manualAddressVerifiedBase, setManualAddressVerifiedBase] = useState<{
+    street: string;
+    suburb: string;
+    city: string;
+    state: string;
+    postcode: string;
+    formatted: string;
+  } | null>(null);
+  const [manualGeoSuggestions, setManualGeoSuggestions] = useState<
+    Array<{
+      placeId: string;
+      street: string;
+      suburb: string;
+      city: string;
+      state: string;
+      postcode: string;
+      line1: string;
+      line2: string;
+      formatted: string;
+      housenumber?: string;
+    }>
+  >([]);
+  const [loadingManualGeo, setLoadingManualGeo] = useState<boolean>(false);
+  const [showManualGeoDropdown, setShowManualGeoDropdown] =
+    useState<boolean>(false);
 
   // Service Form Modal State
   const [editingService, setEditingService] = useState<ServiceItem | null>(
@@ -582,16 +671,29 @@ export default function AdminDashboardPage() {
   const loadAdminData = async (deferAuthSwitch = false) => {
     try {
       const res = await fetch("/api/admin", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
       if (res.status === 401) {
         setAuthenticated(false);
+        setHasPasskeysConfigured(Boolean(data?.hasPasskeys));
+        setHasRecoveryEmailConfigured(Boolean(data?.hasRecoveryEmail));
+        setMaskedRecoveryEmail(String(data?.maskedRecoveryEmail || ""));
         return;
       }
-      const data = await res.json();
       if (data.authenticated) {
         if (!deferAuthSwitch) {
           setAuthenticated(true);
         }
+        setUserRole(data.role === "superadmin" ? "superadmin" : "admin");
         setConfig(data.config);
+        setHasPasskeysConfigured(
+          (Array.isArray(data.config?.adminPasskeys) &&
+            data.config.adminPasskeys.length > 0) ||
+            (Array.isArray(data.config?.superAdminPasskeys) &&
+              data.config.superAdminPasskeys.length > 0)
+        );
+        setHasRecoveryEmailConfigured(
+          Boolean(data.config?.smtpUser && data.config?.smtpPass)
+        );
         setLinks(data.links || []);
         setServices(data.services || []);
         setAppointments(data.appointments || []);
@@ -635,6 +737,140 @@ export default function AdminDashboardPage() {
     loadAdminData();
   }, []);
 
+  // Keep manualAppt.clientAddress synchronized whenever Geoapify street, number, or complement changes
+  useEffect(() => {
+    if (!manualAddressVerifiedBase && !manualAddressStreetQuery.trim()) {
+      setManualAppt((prev) => ({ ...prev, clientAddress: "" }));
+      return;
+    }
+
+    const numPart = manualAddressNumber.trim() || "S/N";
+    const streetName = manualAddressVerifiedBase
+      ? manualAddressVerifiedBase.street || manualAddressVerifiedBase.formatted
+      : manualAddressStreetQuery.trim();
+    const areaParts = manualAddressVerifiedBase
+      ? [
+          manualAddressVerifiedBase.suburb,
+          manualAddressVerifiedBase.city && manualAddressVerifiedBase.state
+            ? `${manualAddressVerifiedBase.city} - ${manualAddressVerifiedBase.state}`
+            : manualAddressVerifiedBase.city || manualAddressVerifiedBase.state,
+          manualAddressVerifiedBase.postcode,
+        ].filter(Boolean)
+      : [];
+
+    let full = manualAddressNumber.trim()
+      ? `${streetName}, ${numPart}`
+      : manualAddressVerifiedBase
+      ? `${streetName}, ${numPart}`
+      : streetName;
+    if (areaParts.length > 0) {
+      full += ` - ${areaParts.join(", ")}`;
+    }
+    if (manualAddressComplement.trim()) {
+      full += ` (${manualAddressComplement.trim()})`;
+    }
+    setManualAppt((prev) => ({ ...prev, clientAddress: full }));
+  }, [
+    manualAddressVerifiedBase,
+    manualAddressStreetQuery,
+    manualAddressNumber,
+    manualAddressComplement,
+  ]);
+
+  // Debounced Geoapify address autocomplete for manual appointment modal
+  useEffect(() => {
+    const q = manualAddressStreetQuery.trim();
+    if (
+      manualAddressVerifiedBase &&
+      q ===
+        (manualAddressVerifiedBase.street ||
+          manualAddressVerifiedBase.formatted)
+    ) {
+      setManualGeoSuggestions([]);
+      setLoadingManualGeo(false);
+      return;
+    }
+    if (q.length < 3) {
+      setManualGeoSuggestions([]);
+      setLoadingManualGeo(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        setLoadingManualGeo(true);
+        const apiKey =
+          process.env.NEXT_PUBLIC_GEOAPIFY_KEY ||
+          "3b4d69632b19443ba05956f3a749ebdb";
+        // Scoped strictly to Vitória da Conquista - BA (25km radius around city center -14.8619, -40.8442)
+        const url = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(
+          q
+        )}&lang=pt&filter=circle:-40.8442,-14.8619,25000&bias=proximity:-40.8442,-14.8619&limit=6&format=json&apiKey=${apiKey}`;
+
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) {
+          setManualGeoSuggestions([]);
+          return;
+        }
+        const data = await res.json();
+        const rawList = Array.isArray(data?.results) ? data.results : [];
+        const mapped = rawList
+          .map((item: Record<string, unknown>, idx: number) => {
+            const street = String(
+              item.street || item.name || item.address_line1 || ""
+            ).trim();
+            const suburb = String(
+              item.suburb || item.district || item.quarter || ""
+            ).trim();
+            const city = String(
+              item.city || item.town || item.municipality || ""
+            ).trim();
+            const state = String(item.state_code || item.state || "").trim();
+            const postcode = String(item.postcode || "").trim();
+            const formatted = String(item.formatted || "").trim();
+            const line1 = String(
+              item.address_line1 || street || formatted
+            ).trim();
+            const line2 = String(
+              item.address_line2 ||
+                [suburb, city && state ? `${city} - ${state}` : city, postcode]
+                  .filter(Boolean)
+                  .join(", ")
+            ).trim();
+            const housenumber = item.housenumber
+              ? String(item.housenumber).trim()
+              : undefined;
+
+            return {
+              placeId: String(item.place_id || `${line1}-${idx}`),
+              street: street || line1,
+              suburb,
+              city,
+              state,
+              postcode,
+              line1,
+              line2,
+              formatted: formatted || `${line1}, ${line2}`,
+              housenumber,
+            };
+          })
+          .filter((item: { line1: string }) => Boolean(item.line1));
+
+        setManualGeoSuggestions(mapped);
+      } catch {
+        // ignore abort errors
+      } finally {
+        setLoadingManualGeo(false);
+      }
+    }, 280);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [manualAddressStreetQuery, manualAddressVerifiedBase]);
+
   const toggleOnlyScheduledDays = () => {
     setOnlyScheduledDays((prev) => {
       const next = !prev;
@@ -645,6 +881,391 @@ export default function AdminDashboardPage() {
       }
       return next;
     });
+  };
+
+  const base64UrlToUint8Array = (base64Url: string): Uint8Array => {
+    const padding = "=".repeat((4 - (base64Url.length % 4)) % 4);
+    const base64 = (base64Url + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
+
+  const arrayBufferToBase64Url = (buffer: ArrayBuffer): string => {
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return window
+      .btoa(binary)
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+  };
+
+  const runSuccessLoginTransition = () => {
+    const dataPromise = loadAdminData(true);
+    setLoginLoading(false);
+    setPasskeyLoading(false);
+    setAwaitingPasskey2FA(false);
+    setLoginAnimStage("fading-form");
+
+    setTimeout(() => {
+      setTickAnimKey((k) => k + 1);
+      setLoginAnimStage("welcome");
+
+      setTimeout(() => {
+        setLoginAnimStage("exiting");
+
+        setTimeout(async () => {
+          await dataPromise;
+          setBottomTab("inicio");
+          setEnterKey((k) => k + 1);
+          setAuthenticated(true);
+          setLoginAnimStage("idle");
+        }, 540);
+      }, 1250);
+    }, 300);
+  };
+
+  const handlePasskeyLogin = async (roleHint?: "admin" | "superadmin") => {
+    setLoginError("");
+    if (
+      typeof window === "undefined" ||
+      !window.PublicKeyCredential ||
+      !navigator.credentials
+    ) {
+      const isInsecureIp =
+        typeof window !== "undefined" &&
+        (!window.isSecureContext ||
+          /^\d+\.\d+\.\d+\.\d+$/.test(window.location.hostname));
+      setLoginError(
+        isInsecureIp
+          ? "No iPhone/celular, o FaceID (Passkey) exige conexão HTTPS com domínio (não funciona acessando por IP http://192.168...)."
+          : "Seu navegador ou dispositivo não suporta Passkeys (WebAuthn)."
+      );
+      return;
+    }
+
+    try {
+      setPasskeyLoading(true);
+      const optRes = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "passkey_login_options",
+          role: roleHint || pending2FARole,
+        }),
+      });
+      const optData = await optRes.json();
+      if (!optRes.ok) {
+        setLoginError(
+          optData.error || "Não foi possível iniciar login com Passkey."
+        );
+        setPasskeyLoading(false);
+        return;
+      }
+
+      const options = optData.options;
+      const publicKeyRequest: PublicKeyCredentialRequestOptions = {
+        challenge: base64UrlToUint8Array(options.challenge)
+          .buffer as ArrayBuffer,
+        rpId: options.rpId,
+        timeout: options.timeout || 60000,
+        userVerification: options.userVerification || "preferred",
+        allowCredentials: Array.isArray(options.allowCredentials)
+          ? options.allowCredentials.map(
+              (c: { id: string; transports?: AuthenticatorTransport[] }) => ({
+                type: "public-key" as const,
+                id: base64UrlToUint8Array(c.id).buffer as ArrayBuffer,
+                transports: c.transports,
+              })
+            )
+          : undefined,
+      };
+
+      const assertion = (await navigator.credentials.get({
+        publicKey: publicKeyRequest,
+      })) as PublicKeyCredential | null;
+
+      if (!assertion) {
+        setLoginError("Autenticação com Passkey cancelada.");
+        setPasskeyLoading(false);
+        return;
+      }
+
+      const assertionRes =
+        assertion.response as AuthenticatorAssertionResponse;
+      const credentialPayload = {
+        id: assertion.id,
+        rawId: arrayBufferToBase64Url(assertion.rawId),
+        type: assertion.type,
+        authenticatorAttachment: (
+          assertion as PublicKeyCredential & {
+            authenticatorAttachment?: string;
+          }
+        ).authenticatorAttachment,
+        clientExtensionResults: assertion.getClientExtensionResults(),
+        response: {
+          clientDataJSON: arrayBufferToBase64Url(assertionRes.clientDataJSON),
+          authenticatorData: arrayBufferToBase64Url(
+            assertionRes.authenticatorData
+          ),
+          signature: arrayBufferToBase64Url(assertionRes.signature),
+          userHandle: assertionRes.userHandle
+            ? arrayBufferToBase64Url(assertionRes.userHandle)
+            : undefined,
+        },
+      };
+
+      const verifyRes = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "passkey_login_verify",
+          credential: credentialPayload,
+        }),
+      });
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok) {
+        setLoginError(
+          verifyData.error || "Falha ao validar Passkey / Biometria."
+        );
+        setPasskeyLoading(false);
+        return;
+      }
+
+      if (verifyData.role === "superadmin" || verifyData.role === "admin") {
+        setUserRole(verifyData.role);
+      }
+      if (verifyData.displayName || verifyData.username) {
+        setWelcomeDisplayName(
+          String(verifyData.displayName || verifyData.username).split(" ")[0]
+        );
+      }
+      runSuccessLoginTransition();
+    } catch (err: unknown) {
+      const errName = (err as { name?: string })?.name;
+      if (errName === "NotAllowedError") {
+        setLoginError("Leitura biométrica cancelada ou não autorizada.");
+      } else {
+        setLoginError("Não foi possível autenticar com Passkey.");
+      }
+      setPasskeyLoading(false);
+    }
+  };
+
+  const handleRegisterPasskey = async () => {
+    if (
+      typeof window === "undefined" ||
+      !window.PublicKeyCredential ||
+      !navigator.credentials
+    ) {
+      const isInsecureIp =
+        typeof window !== "undefined" &&
+        (!window.isSecureContext ||
+          /^\d+\.\d+\.\d+\.\d+$/.test(window.location.hostname));
+      alert(
+        isInsecureIp
+          ? "No iPhone/celular, a Apple exige conexão HTTPS com um domínio (ex: Vercel, ngrok ou túnel Cloudflare) para liberar o FaceID. Acessando via IP local (http://192.168...) o Safari bloqueia o FaceID."
+          : "Seu navegador ou dispositivo não suporta Passkeys (WebAuthn)."
+      );
+      return;
+    }
+
+    try {
+      setRegisteringPasskey(true);
+      const optRes = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "passkey_register_options" }),
+      });
+      const optData = await optRes.json();
+      if (!optRes.ok) {
+        alert(optData.error || "Erro ao gerar desafio de Passkey.");
+        return;
+      }
+
+      const options = optData.options;
+      const publicKeyCreate: PublicKeyCredentialCreationOptions = {
+        rp: options.rp,
+        user: {
+          id: base64UrlToUint8Array(options.user.id).buffer as ArrayBuffer,
+          name: options.user.name,
+          displayName: options.user.displayName,
+        },
+        challenge: base64UrlToUint8Array(options.challenge)
+          .buffer as ArrayBuffer,
+        pubKeyCredParams: options.pubKeyCredParams,
+        timeout: options.timeout || 60000,
+        attestation: options.attestation || "none",
+        authenticatorSelection: options.authenticatorSelection,
+        excludeCredentials: Array.isArray(options.excludeCredentials)
+          ? options.excludeCredentials.map(
+              (c: { id: string; transports?: AuthenticatorTransport[] }) => ({
+                type: "public-key" as const,
+                id: base64UrlToUint8Array(c.id).buffer as ArrayBuffer,
+                transports: c.transports,
+              })
+            )
+          : undefined,
+      };
+
+      const credential = (await navigator.credentials.create({
+        publicKey: publicKeyCreate,
+      })) as PublicKeyCredential | null;
+
+      if (!credential) {
+        return;
+      }
+
+      const attestationRes =
+        credential.response as AuthenticatorAttestationResponse & {
+          getTransports?: () => string[];
+        };
+      const credentialPayload = {
+        id: credential.id,
+        rawId: arrayBufferToBase64Url(credential.rawId),
+        type: credential.type,
+        authenticatorAttachment: (
+          credential as PublicKeyCredential & {
+            authenticatorAttachment?: string;
+          }
+        ).authenticatorAttachment,
+        clientExtensionResults: credential.getClientExtensionResults(),
+        response: {
+          clientDataJSON: arrayBufferToBase64Url(attestationRes.clientDataJSON),
+          attestationObject: arrayBufferToBase64Url(
+            attestationRes.attestationObject
+          ),
+          transports:
+            typeof attestationRes.getTransports === "function"
+              ? attestationRes.getTransports()
+              : undefined,
+        },
+      };
+
+      const defaultDeviceLabel = /iPhone|iPad/i.test(navigator.userAgent)
+        ? "iPhone / FaceID"
+        : /Android/i.test(navigator.userAgent)
+        ? "Android / Biometria"
+        : /Mac/i.test(navigator.userAgent)
+        ? "Mac / TouchID"
+        : "Este Dispositivo";
+
+      const verifyRes = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "passkey_register_verify",
+          credential: credentialPayload,
+          deviceName: newPasskeyName.trim() || defaultDeviceLabel,
+        }),
+      });
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok) {
+        alert(verifyData.error || "Falha ao salvar Passkey.");
+        return;
+      }
+
+      setNewPasskeyName("");
+      await loadAdminData();
+      showToast(verifyData.message || "Passkey cadastrada com sucesso!");
+    } catch (err: unknown) {
+      const errName = (err as { name?: string })?.name;
+      if (errName !== "NotAllowedError") {
+        alert("Não foi possível concluir o cadastro da Passkey.");
+      }
+    } finally {
+      setRegisteringPasskey(false);
+    }
+  };
+
+  const handleRequestRecoveryEmail = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setLoginError("");
+    setRecoveryMessage("");
+    const idToRecover = (recoveryIdentifier || username || "").trim();
+    if (!idToRecover) {
+      setLoginError(
+        "Informe o e-mail ou nome de usuário cadastrado na sua conta."
+      );
+      return;
+    }
+    try {
+      setRecoveryLoading(true);
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "request_password_recovery",
+          identifier: idToRecover,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLoginError(
+          data.error || "Não foi possível enviar o código de recuperação."
+        );
+        return;
+      }
+      if (data.maskedEmail) {
+        setMaskedRecoveryEmail(data.maskedEmail);
+      }
+      setRecoveryMessage(
+        data.message || "Código de 6 dígitos enviado para o seu e-mail!"
+      );
+      setRecoveryStage("verify");
+    } catch {
+      setLoginError("Erro de conexão ao solicitar código por e-mail.");
+    } finally {
+      setRecoveryLoading(false);
+    }
+  };
+
+  const handleVerifyRecoveryCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError("");
+    try {
+      setRecoveryLoading(true);
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "verify_password_recovery",
+          code: recoveryCode.trim(),
+          newPassword: recoveryNewPassword.trim(),
+          disablePasskey2FA: recoveryDisable2FA,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLoginError(data.error || "Código inválido ou expirado.");
+        return;
+      }
+
+      if (data.role === "superadmin" || data.role === "admin") {
+        setUserRole(data.role);
+      }
+      if (data.displayName || data.username) {
+        setWelcomeDisplayName(
+          String(data.displayName || data.username).split(" ")[0]
+        );
+      }
+      setRecoveryStage("idle");
+      setRecoveryCode("");
+      setRecoveryNewPassword("");
+      setRecoveryMessage("");
+      runSuccessLoginTransition();
+    } catch {
+      setLoginError("Erro de conexão ao redefinir senha.");
+    } finally {
+      setRecoveryLoading(false);
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -664,31 +1285,25 @@ export default function AdminDashboardPage() {
         return;
       }
 
-      // Start loading dashboard data in parallel while running the card transition
-      const dataPromise = loadAdminData(true);
+      if (data.role === "superadmin" || data.role === "admin") {
+        setUserRole(data.role);
+      }
+      if (data.displayName || data.username) {
+        setWelcomeDisplayName(
+          String(data.displayName || data.username).split(" ")[0]
+        );
+      }
 
-      // Step 1: Fade out the login form in 0.3s (300ms) inside the exact same card
-      setLoginLoading(false);
-      setLoginAnimStage("fading-form");
+      if (data.require2FA) {
+        setLoginLoading(false);
+        setPending2FARole(data.role);
+        setAwaitingPasskey2FA(true);
+        // Automatically trigger WebAuthn biometric prompt
+        handlePasskeyLogin(data.role);
+        return;
+      }
 
-      setTimeout(() => {
-        // Step 2: Fade in welcome message & trigger SVG draw animation
-        setTickAnimKey((k) => k + 1);
-        setLoginAnimStage("welcome");
-
-        setTimeout(() => {
-          // Step 3: Card slides up and fades out
-          setLoginAnimStage("exiting");
-
-          setTimeout(async () => {
-            await dataPromise;
-            setBottomTab("inicio");
-            setEnterKey((k) => k + 1);
-            setAuthenticated(true);
-            setLoginAnimStage("idle");
-          }, 540);
-        }, 1250);
-      }, 300);
+      runSuccessLoginTransition();
     } catch (err) {
       console.error(err);
       setLoginError("Erro ao conectar ao servidor.");
@@ -944,82 +1559,344 @@ export default function AdminDashboardPage() {
                 : "opacity-100"
             }`}
           >
+            {/* Top-left back arrow button */}
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              aria-label="Voltar para a Home"
+              className="absolute top-4 left-4 w-9 h-9 rounded-full bg-[#FAF8F5] hover:bg-[#EFECE6] border border-[#E5E0D8] flex items-center justify-center text-[#111111] smooth-press cursor-pointer"
+            >
+              <ChevronLeft className="w-5 h-5 stroke-[2.2]" />
+            </button>
+
             <div className="text-center space-y-2">
               <div className="w-14 h-14 mx-auto rounded-full bg-[#FAF8F5] border border-[#E5E0D8] flex items-center justify-center">
-                <Lock className="w-6 h-6 text-[#111111]" />
+                {recoveryStage !== "idle" ? (
+                  <Mail className="w-6 h-6 text-[#111111]" />
+                ) : awaitingPasskey2FA ? (
+                  <Fingerprint className="w-6 h-6 text-[#111111]" />
+                ) : (
+                  <Lock className="w-6 h-6 text-[#111111]" />
+                )}
               </div>
               <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-[#78716C]">
-                PAINEL EXECUTIVO
+                {recoveryStage !== "idle"
+                  ? "RECUPERAÇÃO DE ACESSO"
+                  : awaitingPasskey2FA
+                  ? "VERIFICAÇÃO EM 2 ETAPAS (2FA)"
+                  : "PAINEL EXECUTIVO"}
               </span>
               <h1 className="text-xl font-extrabold text-[#111111]">
-                Isabele Lash Designer
+                {recoveryStage !== "idle"
+                  ? "Redefinir Senha por E-mail"
+                  : awaitingPasskey2FA
+                  ? "Confirme sua Passkey"
+                  : "Isabele Lash Designer"}
               </h1>
               <p className="text-xs text-[#78716C]">
-                Entre com seu usuário e senha para acessar a agenda executiva e
-                configurações.
+                {recoveryStage === "request"
+                  ? "Digite o e-mail ou nome de usuário da sua conta para receber o código de 6 dígitos."
+                  : recoveryStage === "verify"
+                  ? `Digite o código de 6 dígitos enviado para ${maskedRecoveryEmail || "seu e-mail"} e escolha sua nova senha.`
+                  : awaitingPasskey2FA
+                  ? "Use seu FaceID, TouchID ou Biometria cadastrada para liberar o painel."
+                  : "Entre com seu usuário e senha ou use sua Passkey (FaceID / Biometria)."}
               </p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-3.5">
-              <div>
-                <label className="text-[11px] font-bold uppercase tracking-wider text-[#78716C] block mb-1.5">
-                  Usuário
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Digite seu usuário"
-                  className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-2xl px-4 py-3 text-sm font-medium text-[#111111] focus:outline-none focus:border-[#111111] transition-colors"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold uppercase tracking-wider text-[#78716C] block mb-1.5">
-                  Senha
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••"
-                  className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-2xl px-4 py-3 text-sm font-medium text-[#111111] focus:outline-none focus:border-[#111111] transition-colors"
-                />
-              </div>
-
-              {loginError && (
-                <p className="text-xs text-red-600 bg-red-50 border border-red-200 p-3 rounded-xl text-center font-semibold animate-expand">
-                  {loginError}
-                </p>
-              )}
-
-              <button
-                type="submit"
-                disabled={loginLoading || isFormHidden}
-                className="w-full py-4 rounded-[18px] bg-[#0F1115] hover:bg-zinc-800 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md smooth-press cursor-pointer"
+            {recoveryStage === "request" ? (
+              <form
+                onSubmit={handleRequestRecoveryEmail}
+                className="space-y-3.5"
               >
-                {loginLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Entrando...</span>
-                  </>
-                ) : (
-                  <span>Entrar no Painel</span>
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-[#78716C] block mb-1.5">
+                    Seu E-mail ou Usuário Cadastrado
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={recoveryIdentifier}
+                    onChange={(e) => setRecoveryIdentifier(e.target.value)}
+                    placeholder="ex: seuemail@gmail.com ou usuário"
+                    className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-2xl px-4 py-3 text-sm font-medium text-[#111111] focus:outline-none focus:border-[#111111] transition-colors"
+                  />
+                </div>
+
+                {loginError && (
+                  <p className="text-xs text-red-600 bg-red-50 border border-red-200 p-3 rounded-xl text-center font-semibold animate-expand">
+                    {loginError}
+                  </p>
                 )}
-              </button>
-            </form>
 
-            <div className="pt-3 border-t border-[#F0ECE6] text-center">
-              <button
-                type="button"
-                onClick={() => router.push("/")}
-                className="text-xs font-bold text-[#111111] hover:underline cursor-pointer"
-              >
-                ← Voltar para a Página da Cliente
-              </button>
-            </div>
+                <button
+                  type="submit"
+                  disabled={recoveryLoading || isFormHidden}
+                  className="w-full py-4 rounded-[18px] bg-[#0F1115] hover:bg-zinc-800 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md smooth-press cursor-pointer"
+                >
+                  {recoveryLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Enviando código...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>Enviar Código por E-mail</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecoveryStage("idle");
+                    setLoginError("");
+                  }}
+                  className="w-full py-2 text-xs font-bold text-[#78716C] hover:text-[#111111] cursor-pointer"
+                >
+                  Voltar ao login
+                </button>
+              </form>
+            ) : recoveryStage === "verify" ? (
+              <form onSubmit={handleVerifyRecoveryCode} className="space-y-3.5">
+                {recoveryMessage && (
+                  <p className="text-xs text-[#059669] bg-[#10B981]/10 border border-[#10B981]/30 p-3 rounded-xl text-center font-semibold animate-expand">
+                    {recoveryMessage}
+                  </p>
+                )}
+
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-[#78716C] block mb-1.5">
+                    Código de 6 Dígitos
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    required
+                    value={recoveryCode}
+                    onChange={(e) =>
+                      setRecoveryCode(e.target.value.replace(/\D/g, ""))
+                    }
+                    placeholder="000000"
+                    className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-2xl px-4 py-3 text-center text-base font-extrabold tracking-[0.3em] text-[#111111] focus:outline-none focus:border-[#111111] transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-[#78716C] block mb-1.5">
+                    Nova Senha
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={4}
+                    value={recoveryNewPassword}
+                    onChange={(e) => setRecoveryNewPassword(e.target.value)}
+                    placeholder="Digite a nova senha"
+                    className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-2xl px-4 py-3 text-sm font-medium text-[#111111] focus:outline-none focus:border-[#111111] transition-colors"
+                  />
+                </div>
+
+                {hasPasskeysConfigured && (
+                  <label className="flex items-center gap-2.5 p-3 rounded-xl bg-[#FAF8F5] border border-[#E5E0D8] text-xs font-semibold text-[#111111] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={recoveryDisable2FA}
+                      onChange={(e) => setRecoveryDisable2FA(e.target.checked)}
+                      className="rounded border-[#E5E0D8]"
+                    />
+                    <span>Desativar exigência de Passkey 2FA ao entrar</span>
+                  </label>
+                )}
+
+                {loginError && (
+                  <p className="text-xs text-red-600 bg-red-50 border border-red-200 p-3 rounded-xl text-center font-semibold animate-expand">
+                    {loginError}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={recoveryLoading || isFormHidden}
+                  className="w-full py-4 rounded-[18px] bg-[#0F1115] hover:bg-zinc-800 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md smooth-press cursor-pointer"
+                >
+                  {recoveryLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Validando e Entrando...</span>
+                    </>
+                  ) : (
+                    <span>Confirmar Nova Senha e Entrar</span>
+                  )}
+                </button>
+
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    disabled={recoveryLoading}
+                    onClick={() => handleRequestRecoveryEmail()}
+                    className="text-xs font-bold text-[#111111] hover:underline cursor-pointer"
+                  >
+                    Reenviar código
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRecoveryStage("idle");
+                      setLoginError("");
+                      setRecoveryMessage("");
+                    }}
+                    className="text-xs font-bold text-[#78716C] hover:text-[#111111] cursor-pointer"
+                  >
+                    Voltar ao login
+                  </button>
+                </div>
+              </form>
+            ) : awaitingPasskey2FA ? (
+              <div className="space-y-3.5">
+                {loginError && (
+                  <p className="text-xs text-red-600 bg-red-50 border border-red-200 p-3 rounded-xl text-center font-semibold animate-expand">
+                    {loginError}
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  disabled={passkeyLoading || isFormHidden}
+                  onClick={() => handlePasskeyLogin()}
+                  className="w-full py-4 rounded-[18px] bg-[#0F1115] hover:bg-zinc-800 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md smooth-press cursor-pointer"
+                >
+                  {passkeyLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Aguardando Biometria...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Fingerprint className="w-4 h-4" />
+                      <span>Confirmar com Passkey / FaceID</span>
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAwaitingPasskey2FA(false);
+                      setLoginError("");
+                    }}
+                    className="text-xs font-bold text-[#78716C] hover:text-[#111111] cursor-pointer"
+                  >
+                    Voltar ao login
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAwaitingPasskey2FA(false);
+                      setLoginError("");
+                      setRecoveryDisable2FA(true);
+                      if (username.trim()) {
+                        setRecoveryIdentifier(username.trim());
+                      }
+                      setRecoveryStage("request");
+                    }}
+                    className="text-xs font-bold text-[#111111] hover:underline cursor-pointer"
+                  >
+                    Perdi minha Passkey (E-mail)
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleLogin} className="space-y-3.5">
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-[#78716C] block mb-1.5">
+                    Usuário
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Digite seu usuário"
+                    className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-2xl px-4 py-3 text-sm font-medium text-[#111111] focus:outline-none focus:border-[#111111] transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#78716C]">
+                      Senha
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoginError("");
+                        if (username.trim()) {
+                          setRecoveryIdentifier(username.trim());
+                        }
+                        setRecoveryStage("request");
+                      }}
+                      className="text-[11px] font-bold text-[#78716C] hover:text-[#111111] hover:underline cursor-pointer"
+                    >
+                      Esqueceu a senha?
+                    </button>
+                  </div>
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••"
+                    className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-2xl px-4 py-3 text-sm font-medium text-[#111111] focus:outline-none focus:border-[#111111] transition-colors"
+                  />
+                </div>
+
+                {loginError && (
+                  <p className="text-xs text-red-600 bg-red-50 border border-red-200 p-3 rounded-xl text-center font-semibold animate-expand">
+                    {loginError}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loginLoading || passkeyLoading || isFormHidden}
+                  className="w-full py-4 rounded-[18px] bg-[#0F1115] hover:bg-zinc-800 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md smooth-press cursor-pointer"
+                >
+                  {loginLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Entrando...</span>
+                    </>
+                  ) : (
+                    <span>Entrar no Painel</span>
+                  )}
+                </button>
+
+                {hasPasskeysConfigured && (
+                  <button
+                    type="button"
+                    disabled={loginLoading || passkeyLoading || isFormHidden}
+                    onClick={() => handlePasskeyLogin()}
+                    className="w-full py-3.5 rounded-[18px] bg-[#FAF8F5] hover:bg-[#EFECE6] border border-[#E5E0D8] text-[#111111] font-bold text-xs flex items-center justify-center gap-2 smooth-press cursor-pointer"
+                  >
+                    {passkeyLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Verificando Passkey...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Fingerprint className="w-4 h-4 text-[#111111]" />
+                        <span>Entrar com Passkey (FaceID / Biometria)</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </form>
+            )}
           </div>
 
           {/* Welcome Content inside the exact same card (fades in after 0.3s form fade-out & triggers SVG animation) */}
@@ -1034,7 +1911,17 @@ export default function AdminDashboardPage() {
                 className="w-16 h-16 mx-auto"
               />
               <h2 className="text-xl font-extrabold text-[#111111] tracking-tight">
-                Bem vindo, Isabele!
+                Bem vindo,{" "}
+                {welcomeDisplayName ||
+                  (userRole === "superadmin"
+                    ? config?.superAdminUsername || username || "fr4nce"
+                    : (
+                        config?.professionalName ||
+                        config?.adminUsername ||
+                        username ||
+                        "Admin"
+                      ).split(" ")[0])}
+                !
               </h2>
             </div>
           )}
@@ -1117,6 +2004,951 @@ export default function AdminDashboardPage() {
     .replace(/^Studio\s+/i, "")
     .trim();
 
+  // ==================== SUPERADMIN EXCLUSIVE SYSTEM DASHBOARD ====================
+  if (userRole === "superadmin" && !superViewStudioMode && config) {
+    const smtpReady = Boolean(config.smtpUser && config.smtpPass);
+    const superPasskeys = Array.isArray(config.superAdminPasskeys)
+      ? config.superAdminPasskeys
+      : [];
+    const profPasskeys = Array.isArray(config.adminPasskeys)
+      ? config.adminPasskeys
+      : [];
+
+    return (
+      <div className="min-h-dvh bg-[#FAF8F5] text-[#111111] font-sans">
+        {toast && (
+          <div className="fixed bottom-24 left-1/2 z-50 bg-[#0F1115] text-white font-bold text-xs px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2 whitespace-nowrap w-max max-w-[92vw] animate-toast">
+            <CheckCircle2 className="w-4 h-4 text-[#10B981] shrink-0" />
+            <span>{toast}</span>
+          </div>
+        )}
+
+        <div className="max-w-[440px] mx-auto min-h-dvh flex flex-col bg-[#FAF8F5] relative pb-24">
+          {/* Header SuperAdmin (Limpo e alinhado ao padrão executivo) */}
+          <header className="sticky top-0 z-30 bg-[#FAF8F5]/95 backdrop-blur-md px-5 pt-5 pb-4 border-b border-[#EFECE6] flex items-center justify-between animate-card">
+            <div>
+              <h1 className="text-[17px] font-extrabold text-[#111111] leading-tight">
+                {shortStudioTitle || "Isabele Lash"}
+              </h1>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-[#78716C] mt-0.5">
+                SUPERADMIN • @{config.superAdminUsername || "fr4nce"}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setSuperViewStudioMode(true)}
+                aria-label="Abrir Painel da Profissional"
+                title="Abrir Painel da Profissional"
+                className="w-10 h-10 rounded-full bg-[#F4F1EC] hover:bg-[#EAE5DD] flex items-center justify-center text-[#111111] smooth-press cursor-pointer"
+              >
+                <Eye className="w-[18px] h-[18px] stroke-[2]" />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                aria-label="Sair"
+                title="Sair"
+                className="w-10 h-10 rounded-full bg-[#F4F1EC] hover:bg-red-50 text-[#111111] hover:text-red-600 flex items-center justify-center smooth-press cursor-pointer"
+              >
+                <LogOut className="w-[18px] h-[18px] stroke-[2]" />
+              </button>
+            </div>
+          </header>
+
+          {/* ==================== SUPER TAB 1: VISÃO GERAL & CONTROLE ==================== */}
+          {superTab === "visao_geral" && (
+            <main className="px-5 pt-5 space-y-4 flex-1">
+              <div className="animate-card">
+                <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#78716C]">
+                  MONITORAMENTO & INFRAESTRUTURA
+                </span>
+                <h2 className="text-[22px] font-extrabold text-[#111111] tracking-tight">
+                  Status do Sistema
+                </h2>
+              </div>
+
+              {/* Status Cards Grid */}
+              <section className="grid grid-cols-2 gap-2.5 animate-card">
+                <div className="p-4 rounded-[22px] bg-[#141519] text-white space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#A1A1AA]">
+                      PROVEDOR SMTP
+                    </span>
+                    <Server className="w-4 h-4 text-[#10B981]" />
+                  </div>
+                  <p className="text-base font-extrabold text-white">
+                    {smtpReady ? "Ativo & Online" : "Pendente"}
+                  </p>
+                  <p className="text-[10px] text-[#A1A1AA] truncate">
+                    {config.smtpUser || "Não configurado"}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-[22px] bg-white border border-[#EFECE6] space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#78716C]">
+                      CONTA ADMIN (LASH)
+                    </span>
+                    <Users className="w-4 h-4 text-[#111111]" />
+                  </div>
+                  <p className="text-base font-extrabold text-[#111111] truncate">
+                    @{config.adminUsername}
+                  </p>
+                  <p className="text-[10px] text-[#78716C] truncate">
+                    {config.adminEmail || "Sem e-mail de recuperação"}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-[22px] bg-white border border-[#EFECE6] space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#78716C]">
+                      AGENDAMENTOS
+                    </span>
+                    <Calendar className="w-4 h-4 text-[#111111]" />
+                  </div>
+                  <p className="text-lg font-extrabold text-[#111111]">
+                    {appointments.length}
+                  </p>
+                  <p className="text-[10px] text-[#78716C]">
+                    {
+                      appointments.filter((a) => a.status === "agendado")
+                        .length
+                    }{" "}
+                    ativos •{" "}
+                    {
+                      appointments.filter((a) => a.status === "concluido")
+                        .length
+                    }{" "}
+                    concluídos
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-[22px] bg-white border border-[#EFECE6] space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#78716C]">
+                      PASSKEYS (2FA)
+                    </span>
+                    <Fingerprint className="w-4 h-4 text-[#10B981]" />
+                  </div>
+                  <p className="text-lg font-extrabold text-[#111111]">
+                    {superPasskeys.length + profPasskeys.length}
+                  </p>
+                  <p className="text-[10px] text-[#78716C]">
+                    {superPasskeys.length} Gestor • {profPasskeys.length} Admin
+                  </p>
+                </div>
+              </section>
+
+              {/* Resumo Rápido das Contas e Roteamento de Recuperação */}
+              <section className="p-5 rounded-[24px] bg-white border border-[#EFECE6] space-y-3.5 animate-card">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-extrabold text-[#111111]">
+                    Roteamento de Recuperação de Senha
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full bg-[#10B981]/15 text-[#059669] text-[10px] font-extrabold">
+                    Automático
+                  </span>
+                </div>
+                <p className="text-xs text-[#78716C] leading-relaxed">
+                  O seu e-mail SMTP (<b>{config.smtpUser || "não definido"}</b>)
+                  atua exclusivamente como <b>provedor de disparo</b>. Cada
+                  usuário recebe o código no seu próprio e-mail cadastrado:
+                </p>
+
+                <div className="space-y-2 text-xs">
+                  <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EFECE6] flex items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-extrabold uppercase text-[#78716C] block">
+                        PROFISSIONAL (ROLE: ADMIN)
+                      </span>
+                      <p className="font-bold text-[#111111]">
+                        Usuário: {config.adminUsername}
+                      </p>
+                      <p className="text-[11px] text-[#78716C]">
+                        Recebe em:{" "}
+                        <b className="text-[#111111]">
+                          {config.adminEmail || "Não cadastrado!"}
+                        </b>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSuperTab("contas")}
+                      className="px-2.5 py-1.5 rounded-lg bg-white border border-[#E5E0D8] font-bold text-[11px] smooth-press cursor-pointer"
+                    >
+                      Editar
+                    </button>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EFECE6] flex items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-extrabold uppercase text-[#78716C] block">
+                        GESTOR DO SISTEMA (ROLE: SUPERADMIN)
+                      </span>
+                      <p className="font-bold text-[#111111]">
+                        Usuário: {config.superAdminUsername || "fr4nce"}
+                      </p>
+                      <p className="text-[11px] text-[#78716C]">
+                        Recebe em:{" "}
+                        <b className="text-[#111111]">
+                          {config.superAdminEmail ||
+                            "guilhermefrance9@gmail.com"}
+                        </b>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSuperTab("contas")}
+                      className="px-2.5 py-1.5 rounded-lg bg-white border border-[#E5E0D8] font-bold text-[11px] smooth-press cursor-pointer"
+                    >
+                      Editar
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              {/* Atalhos Rápidos de Administração */}
+              <div className="grid grid-cols-2 gap-2.5 animate-card">
+                <button
+                  type="button"
+                  onClick={() => setSuperTab("smtp_seguranca")}
+                  className="p-4 rounded-[22px] bg-white border border-[#EFECE6] hover:bg-[#F4F1EC] text-left space-y-1 smooth-press cursor-pointer"
+                >
+                  <Mail className="w-4 h-4 text-[#111111]" />
+                  <p className="text-xs font-extrabold text-[#111111]">
+                    Configurar SMTP
+                  </p>
+                  <p className="text-[10px] text-[#78716C]">
+                    Servidor de envio e 2FA
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSuperViewStudioMode(true)}
+                  className="p-4 rounded-[22px] bg-white border border-[#EFECE6] hover:bg-[#F4F1EC] text-left space-y-1 smooth-press cursor-pointer"
+                >
+                  <Calendar className="w-4 h-4 text-[#111111]" />
+                  <p className="text-xs font-extrabold text-[#111111]">
+                    Ver Painel da Lash
+                  </p>
+                  <p className="text-[10px] text-[#78716C]">
+                    Inspecionar agenda e bio
+                  </p>
+                </button>
+              </div>
+            </main>
+          )}
+
+          {/* ==================== SUPER TAB 2: CONTAS & ACESSOS (ADMIN + SUPERADMIN) ==================== */}
+          {superTab === "contas" && (
+            <main className="px-5 pt-5 space-y-4 flex-1">
+              <div className="animate-card">
+                <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#78716C]">
+                  CONTROLE DE USUÁRIOS & ROLES
+                </span>
+                <h2 className="text-[22px] font-extrabold text-[#111111] tracking-tight">
+                  Contas do Sistema
+                </h2>
+              </div>
+
+              {/* Card 1: Conta da Profissional (Admin) */}
+              <section className="p-5 rounded-[24px] bg-white border border-[#EFECE6] space-y-3.5 animate-card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#9D5C6D]">
+                      ROLE: ADMIN (PROFISSIONAL)
+                    </span>
+                    <h3 className="text-sm font-extrabold text-[#111111]">
+                      Acesso da Profissional ({config.professionalName})
+                    </h3>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-[#F4F1EC] text-[#111111] text-[10px] font-bold">
+                    @{config.adminUsername}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-[#78716C] block mb-1">
+                      Usuário (Admin)
+                    </label>
+                    <input
+                      type="text"
+                      autoComplete="off"
+                      value={config.adminUsername || ""}
+                      onChange={(e) =>
+                        setConfig({ ...config, adminUsername: e.target.value })
+                      }
+                      className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-2.5 text-xs font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-[#78716C] block mb-1">
+                      Senha (Admin)
+                    </label>
+                    <input
+                      type="text"
+                      autoComplete="off"
+                      value={config.adminPassword || ""}
+                      onChange={(e) =>
+                        setConfig({ ...config, adminPassword: e.target.value })
+                      }
+                      className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-2.5 text-xs font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-[#78716C] block mb-1">
+                    E-mail da Profissional (Para onde o SMTP envia a recuperação
+                    dela)
+                  </label>
+                  <input
+                    type="email"
+                    autoComplete="off"
+                    value={config.adminEmail || ""}
+                    onChange={(e) =>
+                      setConfig({ ...config, adminEmail: e.target.value })
+                    }
+                    placeholder="ex: emaildaisabele@gmail.com"
+                    className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-2.5 text-xs"
+                  />
+                </div>
+
+                {/* Passkeys da Profissional */}
+                {profPasskeys.length > 0 && (
+                  <div className="pt-2 border-t border-[#EFECE6] space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase text-[#78716C]">
+                        Passkeys da Profissional ({profPasskeys.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          runAdminAction("toggle-admin-2fa", {
+                            action: "passkey_toggle_2fa",
+                            targetRole: "admin",
+                            requirePasskey2FA: !config.adminRequirePasskey2FA,
+                          })
+                        }
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer ${
+                          config.adminRequirePasskey2FA
+                            ? "bg-[#10B981] text-white"
+                            : "bg-[#E7E2DA] text-[#57534E]"
+                        }`}
+                      >
+                        2FA:{" "}
+                        {config.adminRequirePasskey2FA ? "Obrigatório" : "Opcional"}
+                      </button>
+                    </div>
+                    {profPasskeys.map((pk) => (
+                      <div
+                        key={pk.id}
+                        className="p-2.5 rounded-xl bg-[#FAF8F5] flex items-center justify-between text-xs"
+                      >
+                        <span className="font-semibold truncate">{pk.name}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            runAdminAction(`del-admin-pk-${pk.id}`, {
+                              action: "passkey_delete",
+                              targetRole: "admin",
+                              passkeyId: pk.id,
+                            })
+                          }
+                          className="text-red-600 font-bold text-[11px] cursor-pointer"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  disabled={busyAction === "save-admin-account"}
+                  onClick={() =>
+                    runAdminAction("save-admin-account", {
+                      action: "update_config",
+                      adminUsername: config.adminUsername,
+                      adminPassword: config.adminPassword,
+                      adminEmail: config.adminEmail || "",
+                    })
+                  }
+                  className="w-full py-3 rounded-xl bg-[#141519] hover:bg-zinc-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 smooth-press cursor-pointer"
+                >
+                  {busyAction === "save-admin-account" ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Save className="w-3.5 h-3.5" />
+                  )}
+                  <span>Salvar Conta da Profissional</span>
+                </button>
+              </section>
+
+              {/* Card 2: Sua Conta de Gestor (SuperAdmin) */}
+              <section className="p-5 rounded-[24px] bg-white border border-[#EFECE6] space-y-3.5 animate-card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#059669]">
+                      ROLE: SUPERADMIN (GESTOR DO SISTEMA)
+                    </span>
+                    <h3 className="text-sm font-extrabold text-[#111111]">
+                      Sua Conta de SuperAdmin
+                    </h3>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-[#141519] text-[#10B981] text-[10px] font-bold">
+                    @{config.superAdminUsername || "fr4nce"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-[#78716C] block mb-1">
+                      Seu Usuário (SuperAdmin)
+                    </label>
+                    <input
+                      type="text"
+                      autoComplete="off"
+                      value={config.superAdminUsername || "fr4nce"}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          superAdminUsername: e.target.value,
+                        })
+                      }
+                      className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-2.5 text-xs font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-[#78716C] block mb-1">
+                      Sua Senha (SuperAdmin)
+                    </label>
+                    <input
+                      type="text"
+                      autoComplete="off"
+                      value={config.superAdminPassword || ""}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          superAdminPassword: e.target.value,
+                        })
+                      }
+                      className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-2.5 text-xs font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-[#78716C] block mb-1">
+                    Seu E-mail Pessoal de Recuperação (SuperAdmin)
+                  </label>
+                  <input
+                    type="email"
+                    autoComplete="off"
+                    value={config.superAdminEmail || ""}
+                    onChange={(e) =>
+                      setConfig({ ...config, superAdminEmail: e.target.value })
+                    }
+                    placeholder="guilhermefrance9@gmail.com"
+                    className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-2.5 text-xs"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  disabled={busyAction === "save-super-account"}
+                  onClick={() =>
+                    runAdminAction("save-super-account", {
+                      action: "update_config",
+                      superAdminUsername: config.superAdminUsername,
+                      superAdminPassword: config.superAdminPassword,
+                      superAdminEmail: config.superAdminEmail || "",
+                    })
+                  }
+                  className="w-full py-3 rounded-xl bg-[#141519] hover:bg-zinc-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 smooth-press cursor-pointer"
+                >
+                  {busyAction === "save-super-account" ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Save className="w-3.5 h-3.5" />
+                  )}
+                  <span>Salvar Conta SuperAdmin</span>
+                </button>
+              </section>
+            </main>
+          )}
+
+          {/* ==================== SUPER TAB 3: PROVEDOR SMTP & SEGURANÇA (PASSKEYS) ==================== */}
+          {superTab === "smtp_seguranca" && (
+            <main className="px-5 pt-5 space-y-4 flex-1">
+              <div className="animate-card">
+                <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#78716C]">
+                  INFRAESTRUTURA DE E-MAIL & AUTENTICAÇÃO
+                </span>
+                <h2 className="text-[22px] font-extrabold text-[#111111] tracking-tight">
+                  Provedor SMTP & Passkey
+                </h2>
+              </div>
+
+              {/* Provedor SMTP do Sistema */}
+              <section className="p-5 rounded-[24px] bg-white border border-[#EFECE6] space-y-3.5 animate-card">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-[#FAF8F5] border border-[#E5E0D8] flex items-center justify-center shrink-0">
+                      <Server className="w-4 h-4 text-[#111111]" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-extrabold text-[#111111]">
+                        Provedor SMTP do Sistema
+                      </h3>
+                      <p className="text-[11px] text-[#78716C]">
+                        Conta remetente que dispara os códigos para cada usuário
+                      </p>
+                    </div>
+                  </div>
+
+                  {smtpReady && (
+                    <span className="px-2.5 py-1 rounded-full bg-[#10B981]/15 text-[#059669] text-[10px] font-extrabold uppercase tracking-wider shrink-0 flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      <span>Ativo</span>
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-2.5 pt-1">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#78716C] block mb-1">
+                      E-mail Remetente do Servidor SMTP
+                    </label>
+                    <input
+                      type="email"
+                      name="smtp_provider_user"
+                      autoComplete="off"
+                      value={config.smtpUser || ""}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          smtpUser: e.target.value,
+                        })
+                      }
+                      placeholder="ex: guilhermefrance9@gmail.com"
+                      className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-2.5 text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#78716C]">
+                        Senha de App do Remetente (SMTP)
+                      </label>
+                      <a
+                        href="https://myaccount.google.com/apppasswords"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-bold text-[#111111] hover:underline inline-flex items-center gap-1"
+                      >
+                        <span>Gerar Senha de App Gmail</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    </div>
+                    <input
+                      type="password"
+                      name="smtp_provider_password"
+                      autoComplete="new-password"
+                      value={config.smtpPass || ""}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          smtpPass: e.target.value,
+                        })
+                      }
+                      placeholder="Senha de App de 16 caracteres"
+                      className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-2.5 text-xs"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-bold uppercase text-[#78716C] block mb-1">
+                        Host SMTP
+                      </label>
+                      <input
+                        type="text"
+                        value={config.smtpHost || "smtp.gmail.com"}
+                        onChange={(e) =>
+                          setConfig({
+                            ...config,
+                            smtpHost: e.target.value,
+                          })
+                        }
+                        className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-2 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase text-[#78716C] block mb-1">
+                        Porta
+                      </label>
+                      <input
+                        type="number"
+                        value={config.smtpPort || 465}
+                        onChange={(e) =>
+                          setConfig({
+                            ...config,
+                            smtpPort: Number(e.target.value) || 465,
+                          })
+                        }
+                        className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-2 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      disabled={busyAction === "save-smtp"}
+                      onClick={() =>
+                        runAdminAction("save-smtp", {
+                          action: "update_config",
+                          smtpHost: config.smtpHost || "smtp.gmail.com",
+                          smtpPort: config.smtpPort || 465,
+                          smtpUser: config.smtpUser || "",
+                          smtpPass: config.smtpPass || "",
+                        })
+                      }
+                      className="py-3 px-3 rounded-xl bg-[#141519] hover:bg-zinc-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 smooth-press cursor-pointer"
+                    >
+                      {busyAction === "save-smtp" ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Save className="w-3.5 h-3.5" />
+                      )}
+                      <span>Salvar Provedor</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={busyAction === "test-smtp"}
+                      onClick={() =>
+                        runAdminAction("test-smtp", {
+                          action: "test_recovery_email",
+                          smtpHost: config.smtpHost || "smtp.gmail.com",
+                          smtpPort: config.smtpPort || 465,
+                          smtpUser: config.smtpUser || "",
+                          smtpPass: config.smtpPass || "",
+                          testDestinationEmail:
+                            config.superAdminEmail || config.smtpUser || "",
+                        })
+                      }
+                      className="py-3 px-3 rounded-xl bg-[#FAF8F5] hover:bg-[#EFECE6] border border-[#E5E0D8] text-[#111111] font-bold text-xs flex items-center justify-center gap-1.5 smooth-press cursor-pointer"
+                    >
+                      {busyAction === "test-smtp" ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Send className="w-3.5 h-3.5" />
+                      )}
+                      <span>Testar Envio</span>
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              {/* Suas Passkeys de SuperAdmin */}
+              <section className="p-5 rounded-[24px] bg-white border border-[#EFECE6] space-y-4 animate-card">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-[#FAF8F5] border border-[#E5E0D8] flex items-center justify-center shrink-0">
+                      <Fingerprint className="w-4 h-4 text-[#111111]" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-extrabold text-[#111111]">
+                        Passkey do SuperAdmin (2FA)
+                      </h3>
+                      <p className="text-[11px] text-[#78716C]">
+                        Biometria vinculada exclusivamente ao perfil @
+                        {config.superAdminUsername || "fr4nce"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  <input
+                    type="text"
+                    value={newPasskeyName}
+                    onChange={(e) => setNewPasskeyName(e.target.value)}
+                    placeholder="Nome do seu aparelho (ex: Meu Mac / Celular)"
+                    className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-2.5 text-xs"
+                  />
+                  <button
+                    type="button"
+                    disabled={registeringPasskey}
+                    onClick={handleRegisterPasskey}
+                    className="w-full py-3 rounded-xl bg-[#141519] hover:bg-zinc-800 text-white font-bold text-xs flex items-center justify-center gap-2 smooth-press cursor-pointer"
+                  >
+                    {registeringPasskey ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Aguardando Biometria...</span>
+                      </>
+                    ) : (
+                      <>
+                        <KeyRound className="w-3.5 h-3.5" />
+                        <span>+ Cadastrar Passkey SuperAdmin</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {superPasskeys.length > 0 && (
+                  <div className="space-y-2.5 pt-2 border-t border-[#EFECE6]">
+                    {superPasskeys.map((pk) => (
+                      <div
+                        key={pk.id}
+                        className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EFECE6] flex items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Fingerprint className="w-4 h-4 text-[#10B981] shrink-0" />
+                          <span className="font-bold truncate">{pk.name}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            runAdminAction(`del-pk-${pk.id}`, {
+                              action: "passkey_delete",
+                              passkeyId: pk.id,
+                            })
+                          }
+                          className="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 font-bold text-[11px] cursor-pointer"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    ))}
+
+                    <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#E5E0D8] flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-extrabold text-[#111111]">
+                          Exigir Passkey 2FA no Login SuperAdmin
+                        </p>
+                        <p className="text-[11px] text-[#78716C]">
+                          Solicita biometria após sua senha
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          runAdminAction("toggle-2fa", {
+                            action: "passkey_toggle_2fa",
+                            requirePasskey2FA: !config.superAdminRequire2FA,
+                          })
+                        }
+                        className={`px-3 py-2 rounded-xl text-[11px] font-extrabold cursor-pointer ${
+                          config.superAdminRequire2FA
+                            ? "bg-[#10B981] text-white"
+                            : "bg-[#E7E2DA] text-[#57534E]"
+                        }`}
+                      >
+                        {config.superAdminRequire2FA ? "Ativado" : "Opcional"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
+            </main>
+          )}
+
+          {/* ==================== SUPER TAB 4: ESTÚDIO & CONTROLE DE DADOS ==================== */}
+          {superTab === "sistema" && (
+            <main className="px-5 pt-5 space-y-4 flex-1">
+              <div className="animate-card">
+                <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#78716C]">
+                  PARÂMETROS GLOBAIS & MANUTENÇÃO
+                </span>
+                <h2 className="text-[22px] font-extrabold text-[#111111] tracking-tight">
+                  Controle do Sistema
+                </h2>
+              </div>
+
+              <section className="p-5 rounded-[24px] bg-white border border-[#EFECE6] space-y-3.5 animate-card">
+                <h3 className="text-sm font-extrabold text-[#111111]">
+                  Identidade da Instância (Cliente)
+                </h3>
+                <div className="space-y-2.5">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-[#78716C] block mb-1">
+                      Nome do Estúdio
+                    </label>
+                    <input
+                      type="text"
+                      value={config.studioName}
+                      onChange={(e) =>
+                        setConfig({ ...config, studioName: e.target.value })
+                      }
+                      className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-2.5 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-[#78716C] block mb-1">
+                      Nome da Profissional
+                    </label>
+                    <input
+                      type="text"
+                      value={config.professionalName}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          professionalName: e.target.value,
+                        })
+                      }
+                      className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-2.5 text-xs"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase text-[#78716C] block mb-1">
+                        WhatsApp Oficial
+                      </label>
+                      <input
+                        type="text"
+                        value={config.whatsapp}
+                        onChange={(e) =>
+                          setConfig({ ...config, whatsapp: e.target.value })
+                        }
+                        className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-2.5 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase text-[#78716C] block mb-1">
+                        Instagram
+                      </label>
+                      <input
+                        type="text"
+                        value={config.instagram}
+                        onChange={(e) =>
+                          setConfig({ ...config, instagram: e.target.value })
+                        }
+                        className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-2.5 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      runAdminAction("save-instance", {
+                        action: "update_config",
+                        studioName: config.studioName,
+                        professionalName: config.professionalName,
+                        whatsapp: config.whatsapp,
+                        instagram: config.instagram,
+                      })
+                    }
+                    className="w-full py-3 rounded-xl bg-[#141519] text-white font-bold text-xs smooth-press cursor-pointer"
+                  >
+                    Salvar Parâmetros da Instância
+                  </button>
+                </div>
+              </section>
+
+              <section className="p-5 rounded-[24px] bg-white border border-[#EFECE6] space-y-3 animate-card">
+                <h3 className="text-sm font-extrabold text-[#111111]">
+                  Ferramentas de Manutenção
+                </h3>
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => setSuperViewStudioMode(true)}
+                    className="w-full py-3 px-4 rounded-xl bg-[#FAF8F5] hover:bg-[#EFECE6] border border-[#E5E0D8] text-[#111111] font-bold text-xs flex items-center justify-between smooth-press cursor-pointer"
+                  >
+                    <span>Acessar Painel Operacional da Profissional</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      runAdminAction("clear-events", {
+                        action: "clear_whatsapp_events",
+                      })
+                    }
+                    className="w-full py-3 px-4 rounded-xl bg-[#FAF8F5] hover:bg-[#EFECE6] border border-[#E5E0D8] text-[#111111] font-bold text-xs flex items-center justify-between smooth-press cursor-pointer"
+                  >
+                    <span>
+                      Limpar Log de Notificações ({whatsappEvents.length})
+                    </span>
+                    <Trash2 className="w-4 h-4 text-red-600" />
+                  </button>
+                </div>
+              </section>
+            </main>
+          )}
+
+          {/* ==================== SUPERADMIN BOTTOM NAVBAR ==================== */}
+          <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#EFECE6] shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+            <div className="max-w-[440px] mx-auto px-5 pt-2.5 pb-3.5 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setSuperTab("visao_geral")}
+                className={`flex flex-col items-center justify-center gap-1.5 py-1.5 px-2.5 smooth-press cursor-pointer ${
+                  superTab === "visao_geral"
+                    ? "text-[#111111] font-extrabold scale-105"
+                    : "text-[#A8A29E] font-medium hover:text-[#111111]"
+                }`}
+              >
+                <Activity className="w-[21px] h-[21px] stroke-[2]" />
+                <span className="text-[11px]">Visão Geral</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSuperTab("contas")}
+                className={`flex flex-col items-center justify-center gap-1.5 py-1.5 px-2.5 smooth-press cursor-pointer ${
+                  superTab === "contas"
+                    ? "text-[#111111] font-extrabold scale-105"
+                    : "text-[#A8A29E] font-medium hover:text-[#111111]"
+                }`}
+              >
+                <Users className="w-[21px] h-[21px] stroke-[2]" />
+                <span className="text-[11px]">Contas</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSuperTab("smtp_seguranca")}
+                className={`flex flex-col items-center justify-center gap-1.5 py-1.5 px-2.5 smooth-press cursor-pointer ${
+                  superTab === "smtp_seguranca"
+                    ? "text-[#111111] font-extrabold scale-105"
+                    : "text-[#A8A29E] font-medium hover:text-[#111111]"
+                }`}
+              >
+                <Server className="w-[21px] h-[21px] stroke-[2]" />
+                <span className="text-[11px]">SMTP & 2FA</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSuperTab("sistema")}
+                className={`flex flex-col items-center justify-center gap-1.5 py-1.5 px-2.5 smooth-press cursor-pointer ${
+                  superTab === "sistema"
+                    ? "text-[#111111] font-extrabold scale-105"
+                    : "text-[#A8A29E] font-medium hover:text-[#111111]"
+                }`}
+              >
+                <Database className="w-[21px] h-[21px] stroke-[2]" />
+                <span className="text-[11px]">Sistema</span>
+              </button>
+            </div>
+          </nav>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-dvh bg-[#FAF8F5] text-[#111111] font-sans">
       {/* Toast Notification */}
@@ -1134,13 +2966,26 @@ export default function AdminDashboardPage() {
       >
         {/* ==================== TOP EXECUTIVE HEADER (Figma Node 1-386) ==================== */}
         <header className="sticky top-0 z-30 bg-[#FAF8F5]/95 backdrop-blur-md px-5 pt-5 pb-4 border-b border-[#EFECE6] flex items-center justify-between animate-card">
-          <div>
-            <h1 className="text-[17px] font-extrabold text-[#111111] leading-tight">
-              {shortStudioTitle || "Isabele Lash"}
-            </h1>
-            <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-[#78716C] mt-0.5">
-              PAINEL EXECUTIVO
-            </span>
+          <div className="flex items-center gap-2.5">
+            {userRole === "superadmin" && superViewStudioMode && (
+              <button
+                type="button"
+                onClick={() => setSuperViewStudioMode(false)}
+                aria-label="Voltar ao SuperAdmin"
+                title="Voltar ao SuperAdmin"
+                className="w-9 h-9 -ml-1.5 rounded-full bg-[#F4F1EC] hover:bg-[#EAE5DD] flex items-center justify-center text-[#111111] smooth-press cursor-pointer"
+              >
+                <ChevronLeft className="w-5 h-5 stroke-[2.2]" />
+              </button>
+            )}
+            <div>
+              <h1 className="text-[17px] font-extrabold text-[#111111] leading-tight">
+                {shortStudioTitle || "Isabele Lash"}
+              </h1>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-[#78716C] mt-0.5">
+                PAINEL EXECUTIVO
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-2.5">
@@ -2663,6 +4508,210 @@ export default function AdminDashboardPage() {
                       Atualizar Senha
                     </button>
                   </section>
+
+                  {/* Passkeys & 2FA (WebAuthn Biometria / FaceID) */}
+                  <section
+                    className="p-5 rounded-[24px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.02)] space-y-4 animate-card smooth-card"
+                    style={{ animationDelay: "90ms" }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-[#FAF8F5] border border-[#E5E0D8] flex items-center justify-center shrink-0">
+                          <Fingerprint className="w-4 h-4 text-[#111111]" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-extrabold text-[#111111]">
+                            Passkey & Biometria (2FA)
+                          </h3>
+                          <p className="text-[11px] text-[#78716C]">
+                            FaceID, TouchID ou Digital do celular
+                          </p>
+                        </div>
+                      </div>
+
+                      {Array.isArray(config.passkeys) &&
+                        config.passkeys.length > 0 && (
+                          <span className="px-2.5 py-1 rounded-full bg-[#10B981]/15 text-[#059669] text-[10px] font-extrabold uppercase tracking-wider shrink-0 flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3" />
+                            <span>Ativo</span>
+                          </span>
+                        )}
+                    </div>
+
+                    {/* Cadastrar Nova Passkey */}
+                    <div className="space-y-2.5 pt-1">
+                      <input
+                        type="text"
+                        value={newPasskeyName}
+                        onChange={(e) => setNewPasskeyName(e.target.value)}
+                        placeholder="Nome do aparelho (ex: iPhone da Isabele)"
+                        className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-2.5 text-xs"
+                      />
+                      <button
+                        type="button"
+                        disabled={registeringPasskey}
+                        onClick={handleRegisterPasskey}
+                        className="w-full py-3 rounded-xl bg-[#141519] hover:bg-zinc-800 text-white font-bold text-xs flex items-center justify-center gap-2 smooth-press cursor-pointer"
+                      >
+                        {registeringPasskey ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Aguardando Biometria do Aparelho...</span>
+                          </>
+                        ) : (
+                          <>
+                            <KeyRound className="w-3.5 h-3.5" />
+                            <span>+ Cadastrar Passkey neste Aparelho</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Lista de Passkeys Cadastradas */}
+                    {Array.isArray(config.passkeys) &&
+                      config.passkeys.length > 0 && (
+                        <div className="space-y-2.5 pt-2 border-t border-[#EFECE6]">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-[#78716C]">
+                            Aparelhos Cadastrados ({config.passkeys.length})
+                          </span>
+                          <div className="space-y-2">
+                            {config.passkeys.map((pk) => (
+                              <div
+                                key={pk.id}
+                                className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EFECE6] flex items-center justify-between gap-2 text-xs"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <Fingerprint className="w-4 h-4 text-[#10B981] shrink-0" />
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-[#111111] truncate">
+                                      {pk.name}
+                                    </p>
+                                    <p className="text-[10px] text-[#78716C]">
+                                      Cadastrado em{" "}
+                                      {new Date(
+                                        pk.createdAt
+                                      ).toLocaleDateString("pt-BR")}
+                                    </p>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    runAdminAction(`del-pk-${pk.id}`, {
+                                      action: "passkey_delete",
+                                      passkeyId: pk.id,
+                                    })
+                                  }
+                                  className="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 font-bold text-[11px] shrink-0 smooth-press cursor-pointer"
+                                >
+                                  Remover
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Toggle Exigir Passkey como 2FA após senha */}
+                          <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#E5E0D8] flex items-center justify-between gap-3 mt-2">
+                            <div className="space-y-0.5">
+                              <p className="text-xs font-extrabold text-[#111111]">
+                                Exigir Passkey como 2FA no Login
+                              </p>
+                              <p className="text-[11px] text-[#78716C] leading-snug">
+                                Mesmo digitando usuário e senha, solicita a
+                                biometria para entrar.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                runAdminAction("toggle-2fa", {
+                                  action: "passkey_toggle_2fa",
+                                  requirePasskey2FA: !config.requirePasskey2FA,
+                                })
+                              }
+                              className={`px-3 py-2 rounded-xl text-[11px] font-extrabold shrink-0 smooth-press cursor-pointer ${
+                                config.requirePasskey2FA
+                                  ? "bg-[#10B981] text-white"
+                                  : "bg-[#E7E2DA] text-[#57534E]"
+                              }`}
+                            >
+                              {config.requirePasskey2FA ? "Ativado" : "Opcional"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                  </section>
+
+                  {/* E-mail de Recuperação de Acesso da Profissional */}
+                  <section
+                    className="p-5 rounded-[24px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.02)] space-y-3.5 animate-card smooth-card"
+                    style={{ animationDelay: "120ms" }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-[#FAF8F5] border border-[#E5E0D8] flex items-center justify-center shrink-0">
+                          <Mail className="w-4 h-4 text-[#111111]" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-extrabold text-[#111111]">
+                            E-mail de Recuperação de Senha
+                          </h3>
+                          <p className="text-[11px] text-[#78716C]">
+                            Receba o código de 6 dígitos neste e-mail caso
+                            esqueça sua senha ou perca sua Passkey
+                          </p>
+                        </div>
+                      </div>
+
+                      {Boolean(config.adminEmail) && (
+                        <span className="px-2.5 py-1 rounded-full bg-[#10B981]/15 text-[#059669] text-[10px] font-extrabold uppercase tracking-wider shrink-0 flex items-center gap-1">
+                          <Check className="w-3 h-3" />
+                          <span>Salvo</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-2.5 pt-1">
+                      <div>
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-[#78716C] block mb-1">
+                          E-mail da Conta ({config.adminUsername})
+                        </label>
+                        <input
+                          type="email"
+                          name="recovery_email_address"
+                          autoComplete="off"
+                          value={config.adminEmail || ""}
+                          onChange={(e) =>
+                            setConfig({
+                              ...config,
+                              adminEmail: e.target.value,
+                            })
+                          }
+                          placeholder="ex: isabele@gmail.com"
+                          className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-2.5 text-xs"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={busyAction === "save-admin-email"}
+                        onClick={() =>
+                          runAdminAction("save-admin-email", {
+                            action: "update_config",
+                            adminEmail: config.adminEmail || "",
+                          })
+                        }
+                        className="w-full py-3 px-3 rounded-xl bg-[#141519] hover:bg-zinc-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 smooth-press cursor-pointer"
+                      >
+                        {busyAction === "save-admin-email" ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Save className="w-3.5 h-3.5" />
+                        )}
+                        <span>Salvar E-mail de Recuperação</span>
+                      </button>
+                    </div>
+                  </section>
                 </div>
               )}
             </div>
@@ -3241,10 +5290,138 @@ export default function AdminDashboardPage() {
                 <b>WhatsApp:</b> {selectedAppointment.clientPhone}
               </p>
               {selectedAppointment.clientAddress && (
-                <p>
-                  <b>Endereço (Domicílio):</b>{" "}
-                  {selectedAppointment.clientAddress}
-                </p>
+                <div className="space-y-2 pt-0.5">
+                  <p>
+                    <b>Endereço (Domicílio):</b>{" "}
+                    {selectedAppointment.clientAddress}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const addr = selectedAppointment.clientAddress!.trim();
+                        const cleanAddr = addr.replace(/\([^)]*\)/g, "").trim();
+                        const encodedAddr = encodeURIComponent(addr);
+                        const shortTitle = encodeURIComponent(
+                          addr.split(" - ")[0] || addr
+                        );
+                        let coords: { lat: number; lon: number } | null = null;
+                        try {
+                          const apiKey =
+                            process.env.NEXT_PUBLIC_GEOAPIFY_KEY ||
+                            "3b4d69632b19443ba05956f3a749ebdb";
+                          const res = await fetch(
+                            `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(
+                              cleanAddr
+                            )}&lang=pt&filter=circle:-40.8442,-14.8619,35000&bias=proximity:-40.8442,-14.8619&limit=1&format=json&apiKey=${apiKey}`
+                          );
+                          if (res.ok) {
+                            const data = await res.json();
+                            const first = data?.results?.[0];
+                            if (
+                              first &&
+                              typeof first.lat === "number" &&
+                              typeof first.lon === "number"
+                            ) {
+                              coords = { lat: first.lat, lon: first.lon };
+                            }
+                          }
+                        } catch {
+                          // fallback
+                        }
+                        try {
+                          if (navigator.clipboard) {
+                            await navigator.clipboard.writeText(addr);
+                          }
+                        } catch {
+                          // ignore
+                        }
+                        const isMobile = /Android|iPhone|iPad|iPod/i.test(
+                          navigator.userAgent || ""
+                        );
+                        if (isMobile) {
+                          const nativeUberUrl = coords
+                            ? `uber://?action=setPickup&pickup=my_location&dropoff[latitude]=${coords.lat}&dropoff[longitude]=${coords.lon}&dropoff[nickname]=${shortTitle}&dropoff[formatted_address]=${encodedAddr}`
+                            : `uber://?action=setPickup&pickup=my_location&dropoff[nickname]=${shortTitle}&dropoff[formatted_address]=${encodedAddr}`;
+                          window.location.href = nativeUberUrl;
+                          showToast("Abrindo app da Uber com endereço marcado...");
+                        } else {
+                          const dropJson = encodeURIComponent(
+                            JSON.stringify({
+                              latitude: coords?.lat,
+                              longitude: coords?.lon,
+                              addressLine1: addr.split(" - ")[0] || addr,
+                              addressLine2: addr,
+                            })
+                          );
+                          window.open(
+                            `https://m.uber.com/go/home?drop[0]=${dropJson}`,
+                            "_blank",
+                            "noopener,noreferrer"
+                          );
+                          showToast("Abrindo Uber (endereço copiado!)");
+                        }
+                      }}
+                      className="py-2 px-2.5 rounded-xl bg-[#111111] hover:bg-zinc-800 text-white font-bold text-[11px] flex items-center justify-center gap-1.5 smooth-press cursor-pointer"
+                    >
+                      <span className="px-1.5 py-0.5 rounded bg-white/15 text-[9px] font-black">
+                        Uber
+                      </span>
+                      <span>Abrir na Uber</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const addr = selectedAppointment.clientAddress!.trim();
+                        const cleanAddr = addr.replace(/\([^)]*\)/g, "").trim();
+                        const encodedAddr = encodeURIComponent(addr);
+                        let coords: { lat: number; lon: number } | null = null;
+                        try {
+                          if (navigator.clipboard) {
+                            await navigator.clipboard.writeText(addr);
+                          }
+                        } catch {
+                          // ignore
+                        }
+                        try {
+                          const apiKey =
+                            process.env.NEXT_PUBLIC_GEOAPIFY_KEY ||
+                            "3b4d69632b19443ba05956f3a749ebdb";
+                          const res = await fetch(
+                            `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(
+                              cleanAddr
+                            )}&lang=pt&filter=circle:-40.8442,-14.8619,35000&bias=proximity:-40.8442,-14.8619&limit=1&format=json&apiKey=${apiKey}`
+                          );
+                          if (res.ok) {
+                            const data = await res.json();
+                            const first = data?.results?.[0];
+                            if (
+                              first &&
+                              typeof first.lat === "number" &&
+                              typeof first.lon === "number"
+                            ) {
+                              coords = { lat: first.lat, lon: first.lon };
+                            }
+                          }
+                        } catch {
+                          // fallback
+                        }
+                        const url99 = coords
+                          ? `taxis99://call?dropoff_latitude=${coords.lat}&dropoff_longitude=${coords.lon}&dropoff_title=${encodedAddr}&deep_link_product_id=316`
+                          : `taxis99://call?dropoff_title=${encodedAddr}&deep_link_product_id=316`;
+                        window.location.href = url99;
+                        showToast("Abrindo 99 com endereço marcado...");
+                      }}
+                      className="py-2 px-2.5 rounded-xl bg-[#FFB800] hover:bg-[#F2AE00] text-[#111111] font-extrabold text-[11px] flex items-center justify-center gap-1.5 smooth-press cursor-pointer"
+                    >
+                      <span className="px-1.5 py-0.5 rounded bg-[#111111] text-[#FFB800] text-[9px] font-black">
+                        99
+                      </span>
+                      <span>Abrir no 99</span>
+                    </button>
+                  </div>
+                </div>
               )}
               {selectedAppointment.clientNotes && (
                 <p>
@@ -3564,22 +5741,187 @@ export default function AdminDashboardPage() {
                 />
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold uppercase text-[#78716C] block mb-1">
-                  Endereço (Atendimento a Domicílio)
-                </label>
-                <input
-                  type="text"
-                  value={manualAppt.clientAddress}
-                  onChange={(e) =>
-                    setManualAppt({
-                      ...manualAppt,
-                      clientAddress: e.target.value,
-                    })
-                  }
-                  placeholder="Rua, número, complemento e bairro"
-                  className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-3 text-xs font-medium"
-                />
+              {/* ENDEREÇO PARA ATENDIMENTO A DOMICÍLIO (Geoapify Autocomplete + Número e Complemento) */}
+              <div className="space-y-2.5">
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-1">
+                    <label
+                      htmlFor="admin-manual-address"
+                      className="text-[10px] font-bold uppercase text-[#78716C] block"
+                    >
+                      Endereço (Atendimento a Domicílio)
+                    </label>
+                    {manualAddressVerifiedBase ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[#10B981]">
+                        <Check className="w-3 h-3 stroke-[2.8]" />
+                        <span>Localizado no Maps</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-[#A8A29E]">
+                        Busca no mapa
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-3 flex items-center gap-2">
+                    <MapPin
+                      className={`w-4 h-4 shrink-0 transition-colors ${
+                        manualAddressVerifiedBase
+                          ? "text-[#10B981]"
+                          : "text-[#9CA3AF]"
+                      }`}
+                    />
+                    <input
+                      id="admin-manual-address"
+                      type="text"
+                      name="geoapify_manual_street_search"
+                      autoComplete="new-password"
+                      value={manualAddressStreetQuery}
+                      onFocus={() => setShowManualGeoDropdown(true)}
+                      onBlur={() => {
+                        setTimeout(() => setShowManualGeoDropdown(false), 180);
+                      }}
+                      onChange={(e) => {
+                        setManualAddressStreetQuery(e.target.value);
+                        setManualAddressVerifiedBase(null);
+                        setShowManualGeoDropdown(true);
+                      }}
+                      placeholder="Digite a rua, avenida ou CEP..."
+                      className="w-full bg-transparent text-xs font-medium text-[#111111] placeholder:text-[#A8A29E] focus:outline-none"
+                    />
+                    {loadingManualGeo && (
+                      <Loader2 className="w-3.5 h-3.5 text-[#78716C] animate-spin shrink-0" />
+                    )}
+                    {manualAddressStreetQuery && !loadingManualGeo && (
+                      <button
+                        type="button"
+                        aria-label="Limpar endereço"
+                        onClick={() => {
+                          setManualAddressStreetQuery("");
+                          setManualAddressVerifiedBase(null);
+                          setManualGeoSuggestions([]);
+                        }}
+                        className="w-5 h-5 rounded-full bg-[#EFECE6] hover:bg-[#E5E0D8] flex items-center justify-center text-[#78716C] shrink-0 cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {manualAddressVerifiedBase && (
+                    <p className="text-[11px] font-medium text-[#78716C] mt-1 pl-1 truncate">
+                      {[
+                        manualAddressVerifiedBase.suburb,
+                        manualAddressVerifiedBase.city &&
+                        manualAddressVerifiedBase.state
+                          ? `${manualAddressVerifiedBase.city} - ${manualAddressVerifiedBase.state}`
+                          : manualAddressVerifiedBase.city,
+                        manualAddressVerifiedBase.postcode,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </p>
+                  )}
+
+                  {/* Dropdown de sugestões Geoapify */}
+                  {showManualGeoDropdown &&
+                    !manualAddressVerifiedBase &&
+                    (manualGeoSuggestions.length > 0 ||
+                      (manualAddressStreetQuery.trim().length >= 3 &&
+                        !loadingManualGeo)) && (
+                      <ScrollArea
+                        maxHeightClass="max-h-44"
+                        className="mt-1.5 p-1.5 rounded-xl bg-white border border-[#E5E0D8] shadow-[0_8px_24px_rgba(0,0,0,0.08)] space-y-1"
+                      >
+                        {manualGeoSuggestions.length === 0 ? (
+                          <p className="text-[11px] text-[#78716C] py-2 px-2">
+                            Nenhum endereço encontrado. Tente digitar o nome da
+                            rua ou CEP.
+                          </p>
+                        ) : (
+                          manualGeoSuggestions.map((item) => (
+                            <button
+                              key={item.placeId}
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                setManualAddressStreetQuery(
+                                  item.street || item.line1
+                                );
+                                if (
+                                  item.housenumber &&
+                                  !manualAddressNumber.trim()
+                                ) {
+                                  setManualAddressNumber(item.housenumber);
+                                }
+                                setManualAddressVerifiedBase({
+                                  street: item.street || item.line1,
+                                  suburb: item.suburb,
+                                  city: item.city,
+                                  state: item.state,
+                                  postcode: item.postcode,
+                                  formatted: item.formatted,
+                                });
+                                setShowManualGeoDropdown(false);
+                              }}
+                              className="w-full p-2.5 rounded-xl bg-[#FAF8F5] hover:bg-[#F3EFEA] text-left flex items-start gap-2.5 transition cursor-pointer"
+                            >
+                              <MapPin className="w-3.5 h-3.5 text-[#111111] shrink-0 mt-0.5" />
+                              <div className="min-w-0">
+                                <p className="text-xs font-extrabold text-[#111111] truncate">
+                                  {item.line1}
+                                </p>
+                                {item.line2 && (
+                                  <p className="text-[11px] font-medium text-[#78716C] truncate">
+                                    {item.line2}
+                                  </p>
+                                )}
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </ScrollArea>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-5 gap-2">
+                  <div className="col-span-2">
+                    <label
+                      htmlFor="admin-manual-address-num"
+                      className="text-[10px] font-bold uppercase text-[#78716C] block mb-1"
+                    >
+                      Número
+                    </label>
+                    <input
+                      id="admin-manual-address-num"
+                      type="text"
+                      autoComplete="off"
+                      value={manualAddressNumber}
+                      onChange={(e) => setManualAddressNumber(e.target.value)}
+                      placeholder="Ex: 120"
+                      className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-3 text-xs font-medium"
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <label
+                      htmlFor="admin-manual-address-comp"
+                      className="text-[10px] font-bold uppercase text-[#78716C] block mb-1"
+                    >
+                      Complemento (Opcional)
+                    </label>
+                    <input
+                      id="admin-manual-address-comp"
+                      type="text"
+                      autoComplete="off"
+                      value={manualAddressComplement}
+                      onChange={(e) =>
+                        setManualAddressComplement(e.target.value)
+                      }
+                      placeholder="Casa, Apto, Ref..."
+                      className="w-full bg-[#FAF8F5] border border-[#E5E0D8] rounded-xl p-3 text-xs font-medium"
+                    />
+                  </div>
+                </div>
               </div>
 
               <button
@@ -3595,6 +5937,18 @@ export default function AdminDashboardPage() {
                     () => {
                       setShowManualModal(false);
                       setAgendaDate(manualAppt.date);
+                      setManualAppt((prev) => ({
+                        ...prev,
+                        clientName: "",
+                        clientPhone: "",
+                        clientAddress: "",
+                        clientNotes: "",
+                      }));
+                      setManualAddressStreetQuery("");
+                      setManualAddressNumber("");
+                      setManualAddressComplement("");
+                      setManualAddressVerifiedBase(null);
+                      setManualGeoSuggestions([]);
                     }
                   )
                 }

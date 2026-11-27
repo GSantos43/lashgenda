@@ -24,8 +24,20 @@ model StudioConfig {
   availableSlotsJson  String   @default("[\"09:00\", \"10:30\", \"13:30\", \"15:00\", \"16:30\", \"18:00\", \"19:30\"]")
   portfolioJson       String   @default("[\"https://images.unsplash.com/photo-1583001931096-959e9a1a6223?w=500&auto=format&fit=crop&q=80\",\"https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=500&auto=format&fit=crop&q=80\",\"https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=80\"]")
   whatsappMessageTemplate String @default("Olá! Gostaria de tirar uma dúvida sobre os procedimentos de extensão de cílios ✨")
-  adminUsername       String   @default("admin")
-  adminPassword       String   @default("123456")
+  adminUsername       String   @default("isabele")
+  adminPassword       String   @default("Deus2006.")
+  adminEmail          String   @default("")
+  superAdminUsername  String   @default("fr4nce")
+  superAdminPassword  String   @default("yeshua77377")
+  superAdminEmail     String   @default("guilhermefrance9@gmail.com")
+  superAdminPasskeysJson String @default("[]")
+  superAdminRequire2FA Boolean @default(false)
+  smtpHost            String   @default("smtp.gmail.com")
+  smtpPort            Int      @default(465)
+  smtpUser            String   @default("")
+  smtpPass            String   @default("")
+  passkeysJson        String   @default("[]")
+  requirePasskey2FA   Boolean  @default(false)
   updatedAt           DateTime @updatedAt
 }
 

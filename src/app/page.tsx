@@ -324,11 +324,11 @@ export default function LinktreeHomePage() {
           className="flex items-center justify-center gap-3.5 mt-3 mb-7 animate-card"
           style={{ animationDelay: "190ms" }}
         >
-          {/* Website / Agenda */}
+          {/* Website / Painel Admin */}
           <button
             type="button"
-            onClick={() => router.push("/agendar")}
-            aria-label="Agendamento Online"
+            onClick={() => router.push("/admin")}
+            aria-label="Painel Administrativo"
             className="w-9 h-9 rounded-lg bg-[#FCEEEF] hover:bg-[#18181B] text-[#18181B] hover:text-[#FAF7F2] border border-[#C5A880]/35 flex items-center justify-center smooth-press cursor-pointer"
           >
             <Globe className="w-[18px] h-[18px] stroke-[2]" />

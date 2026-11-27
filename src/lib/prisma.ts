@@ -2,15 +2,23 @@ import { PrismaClient } from "@prisma/client";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+  prismaSchemaVersion: number | undefined;
 };
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: ["error"],
-  });
+const PRISMA_SCHEMA_VERSION = 2;
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+export const prisma =
+  globalForPrisma.prisma &&
+  globalForPrisma.prismaSchemaVersion === PRISMA_SCHEMA_VERSION
+    ? globalForPrisma.prisma
+    : new PrismaClient({
+        log: ["error"],
+      });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+  globalForPrisma.prismaSchemaVersion = PRISMA_SCHEMA_VERSION;
+}
 
 export function normalizePhone(phone: string): string {
   const digits = (phone || "").replace(/\D/g, "");
@@ -84,8 +92,8 @@ export async function ensureSeedData() {
         ]),
         whatsappMessageTemplate:
           "Olá Camila! Vim pelo seu link da bio e gostaria de tirar uma dúvida sobre os procedimentos de cílios ✨",
-        adminUsername: "admin",
-        adminPassword: "123456",
+        adminUsername: "isabele",
+        adminPassword: "Deus2006.",
       },
     });
   }

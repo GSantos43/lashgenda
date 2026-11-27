@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Calendar,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   Clock,
   ExternalLink,
@@ -96,10 +97,178 @@ export default function AtendimentoDetailPage() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [confirmCancelModal, setConfirmCancelModal] = useState(false);
+  const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(
+    null
+  );
+  const [openingRideApp, setOpeningRideApp] = useState<"uber" | "99" | null>(
+    null
+  );
+  const [rideMenuOpen, setRideMenuOpen] = useState(false);
+  const rideMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        rideMenuRef.current &&
+        !rideMenuRef.current.contains(e.target as Node)
+      ) {
+        setRideMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3200);
+  };
+
+  // Geocode clientAddress in background so Uber and 99 deep links have exact dropoff coordinates
+  useEffect(() => {
+    const addr = appointment?.clientAddress?.trim();
+    if (!addr) {
+      setCoords(null);
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    async function resolveCoordinates(rawAddress: string) {
+      try {
+        const cleanAddress = rawAddress.replace(/\([^)]*\)/g, "").trim();
+        const apiKey =
+          process.env.NEXT_PUBLIC_GEOAPIFY_KEY ||
+          "3b4d69632b19443ba05956f3a749ebdb";
+        const url = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(
+          cleanAddress
+        )}&lang=pt&filter=circle:-40.8442,-14.8619,35000&bias=proximity:-40.8442,-14.8619&limit=1&format=json&apiKey=${apiKey}`;
+
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const first = Array.isArray(data?.results) ? data.results[0] : null;
+        if (
+          first &&
+          typeof first.lat === "number" &&
+          typeof first.lon === "number"
+        ) {
+          return { lat: first.lat, lon: first.lon };
+        }
+      } catch {
+        // ignore abort or network error
+      }
+      return null;
+    }
+
+    resolveCoordinates(addr).then((found) => {
+      if (!cancelled && found) {
+        setCoords(found);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [appointment?.clientAddress]);
+
+  const handleOpenRideApp = async (provider: "uber" | "99") => {
+    const addr = appointment?.clientAddress?.trim();
+    if (!addr) return;
+
+    setOpeningRideApp(provider);
+    let resolved = coords;
+
+    // Fallback instant lookup if user clicked before background geocode completed
+    if (!resolved) {
+      try {
+        const cleanAddress = addr.replace(/\([^)]*\)/g, "").trim();
+        const apiKey =
+          process.env.NEXT_PUBLIC_GEOAPIFY_KEY ||
+          "3b4d69632b19443ba05956f3a749ebdb";
+        const url = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(
+          cleanAddress
+        )}&lang=pt&filter=circle:-40.8442,-14.8619,35000&bias=proximity:-40.8442,-14.8619&limit=1&format=json&apiKey=${apiKey}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          const first = Array.isArray(data?.results) ? data.results[0] : null;
+          if (
+            first &&
+            typeof first.lat === "number" &&
+            typeof first.lon === "number"
+          ) {
+            resolved = { lat: first.lat, lon: first.lon };
+            setCoords(resolved);
+          }
+        }
+      } catch {
+        // continue with text-only fallback
+      }
+    }
+
+    const encodedAddr = encodeURIComponent(addr);
+    const shortTitle = encodeURIComponent(addr.split(" - ")[0] || addr);
+
+    if (provider === "uber") {
+      try {
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(addr);
+        }
+      } catch {
+        // ignore clipboard permissions error
+      }
+
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(
+        navigator.userAgent || ""
+      );
+
+      if (isMobile) {
+        // Direct native app scheme so mobile browsers open the Uber app directly with dropoff marked
+        const nativeUberUrl = resolved
+          ? `uber://?action=setPickup&pickup=my_location&dropoff[latitude]=${resolved.lat}&dropoff[longitude]=${resolved.lon}&dropoff[nickname]=${shortTitle}&dropoff[formatted_address]=${encodedAddr}`
+          : `uber://?action=setPickup&pickup=my_location&dropoff[nickname]=${shortTitle}&dropoff[formatted_address]=${encodedAddr}`;
+
+        window.location.href = nativeUberUrl;
+        showToast("Abrindo app da Uber com endereço marcado...");
+        setTimeout(() => setOpeningRideApp(null), 600);
+        return;
+      }
+
+      // Desktop/Web fallback: use Uber mobile web JSON dropoff format
+      const dropJson = encodeURIComponent(
+        JSON.stringify({
+          latitude: resolved?.lat,
+          longitude: resolved?.lon,
+          addressLine1: addr.split(" - ")[0] || addr,
+          addressLine2: addr,
+        })
+      );
+      const webUberUrl = `https://m.uber.com/go/home?drop[0]=${dropJson}`;
+      window.open(webUberUrl, "_blank", "noopener,noreferrer");
+      showToast("Abrindo Uber (endereço também copiado!)");
+      setOpeningRideApp(null);
+      return;
+    }
+
+    // 99 App: copy address to clipboard as helpful backup & trigger 99 deep link with dropoff coordinates and title
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(addr);
+      }
+    } catch {
+      // ignore clipboard permissions error
+    }
+
+    const deepLink99 = resolved
+      ? `taxis99://call?dropoff_latitude=${resolved.lat}&dropoff_longitude=${resolved.lon}&dropoff_title=${encodedAddr}&deep_link_product_id=316`
+      : `taxis99://call?dropoff_title=${encodedAddr}&deep_link_product_id=316`;
+
+    window.location.href = deepLink99;
+    showToast("Abrindo 99 com endereço marcado...");
+    setTimeout(() => setOpeningRideApp(null), 600);
   };
 
   const loadAppointment = async () => {
@@ -414,17 +583,68 @@ export default function AtendimentoDetailPage() {
                       </div>
                     </div>
 
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                        appointment.clientAddress
-                      )}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-2 rounded-xl bg-[#FAF8F5] hover:bg-[#F3EFEA] border border-[#EFECE6] text-[#111111] text-[11px] font-bold inline-flex items-center gap-1.5 shrink-0 smooth-press"
-                    >
-                      <span>Abrir Rota</span>
-                      <ExternalLink className="w-3.5 h-3.5 text-[#78716C]" />
-                    </a>
+                    {/* Select Personalizado Uber / 99 no lugar de Abrir Rota */}
+                    <div className="relative shrink-0" ref={rideMenuRef}>
+                      <button
+                        type="button"
+                        onClick={() => setRideMenuOpen((prev) => !prev)}
+                        className="px-3 py-2 rounded-xl bg-[#FAF8F5] hover:bg-[#F3EFEA] border border-[#EFECE6] text-[#111111] text-[11px] font-bold inline-flex items-center gap-1.5 shrink-0 smooth-press cursor-pointer"
+                      >
+                        <span className="px-1.5 py-0.5 rounded bg-[#111111] text-white text-[9px] font-black tracking-tight">
+                          Uber
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-[#FFB800] text-[#111111] text-[9px] font-black tracking-tight">
+                          99
+                        </span>
+                        <ChevronDown
+                          className={`w-3.5 h-3.5 text-[#78716C] transition-transform duration-200 ${
+                            rideMenuOpen ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+
+                      {rideMenuOpen && (
+                        <div className="absolute right-0 mt-2 w-44 p-2 rounded-2xl bg-white border border-[#EFECE6] shadow-[0_12px_32px_rgba(0,0,0,0.12)] z-30 space-y-2 animate-card">
+                          <button
+                            type="button"
+                            disabled={openingRideApp !== null}
+                            onClick={() => {
+                              setRideMenuOpen(false);
+                              handleOpenRideApp("uber");
+                            }}
+                            className="w-full py-2.5 px-3 rounded-xl bg-[#111111] hover:bg-zinc-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-2xs smooth-press cursor-pointer"
+                          >
+                            {openingRideApp === "uber" ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded-md bg-white/15 text-[10px] font-black tracking-tight text-white">
+                                Uber
+                              </span>
+                            )}
+                            <span>Abrir na Uber</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={openingRideApp !== null}
+                            onClick={() => {
+                              setRideMenuOpen(false);
+                              handleOpenRideApp("99");
+                            }}
+                            className="w-full py-2.5 px-3 rounded-xl bg-[#FFB800] hover:bg-[#F2AE00] text-[#111111] font-extrabold text-xs flex items-center justify-center gap-2 shadow-2xs smooth-press cursor-pointer"
+                          >
+                            {openingRideApp === "99" ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#111111]" />
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded-md bg-[#111111] text-[#FFB800] text-[10px] font-black tracking-tight">
+                                99
+                              </span>
+                            )}
+                            <span>Abrir no 99</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="w-full h-64 rounded-2xl overflow-hidden border border-[#EFECE6] bg-[#FAF8F5] shadow-2xs">
